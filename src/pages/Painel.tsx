@@ -12,7 +12,6 @@ const estadoCls: Record<Estado, string> = {
 }
 
 function hojeISO() {
-  // data local sem depender de toISOString (fuso)
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -22,6 +21,7 @@ export default function Painel() {
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [sel, setSel] = useState<string>('')
+  const [aberto, setAberto] = useState(false)
   const [loading, setLoading] = useState(true)
   const [link, setLink] = useState('')
 
@@ -42,10 +42,24 @@ export default function Painel() {
   const meses = useMemo(() => sortMrefsDesc(comissoes.map((c) => c.mes_referencia)), [comissoes])
   useEffect(() => { if (!sel && meses.length) setSel(meses[0]) }, [meses, sel])
 
+  // agrupar meses por ano para o seletor
+  const porAno = useMemo(() => {
+    const m: Record<number, string[]> = {}
+    for (const mr of meses) { const y = parseMref(mr).year; (m[y] ||= []).push(mr) }
+    return m
+  }, [meses])
+  const anos = Object.keys(porAno).map(Number).sort((a, b) => b - a)
+
+  const idx = meses.indexOf(sel)
+  const irAnterior = () => { if (idx < meses.length - 1) { setSel(meses[idx + 1]); setLink('') } }
+  const irSeguinte = () => { if (idx > 0) { setSel(meses[idx - 1]); setLink('') } }
+
   const selOrder = sel ? parseMref(sel).order : 0
   const proprias = comissoes.filter((c) => c.mes_referencia === sel)
   const transitadas = comissoes.filter((c) => c.estado !== 'paga' && parseMref(c.mes_referencia).order < selOrder)
-  const visiveis = [...transitadas, ...proprias]
+  const visiveis = aberto
+    ? comissoes.filter((c) => c.estado !== 'paga')
+    : [...transitadas, ...proprias]
 
   const totComissao = visiveis.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
   const totPago = visiveis.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
@@ -59,10 +73,8 @@ export default function Painel() {
   async function gerarLink() {
     const ids = visiveis.map((c) => c.id)
     const { data, error } = await supabase
-      .from('envios')
-      .insert({ mes_referencia: sel, comissao_ids: ids, total_comissoes: totComissao })
-      .select('token')
-      .single()
+      .from('envios').insert({ mes_referencia: sel, comissao_ids: ids, total_comissoes: totComissao })
+      .select('token').single()
     if (error) { alert('Erro: ' + error.message); return }
     setLink(`${window.location.origin}/validacao/${data.token}`)
   }
@@ -71,24 +83,40 @@ export default function Painel() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-host-navy">Painel de comissões</h1>
-          <p className="text-sm text-gray-500">Cada mês é uma página. As não-pagas transitam para os meses seguintes.</p>
-        </div>
-        <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-4 py-2 hover:opacity-90">
-          Fechar mês / Gerar link do diretor
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h1 className="text-2xl font-bold text-host-navy">Painel de comissões</h1>
+        {!aberto && (
+          <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-4 py-2 hover:opacity-90">
+            Fechar mês / Gerar link do diretor
+          </button>
+        )}
       </div>
 
-      {/* seletor de mês */}
-      <div className="flex flex-wrap gap-2 mb-4">
-        {meses.map((m) => (
-          <button key={m} onClick={() => { setSel(m); setLink('') }}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium border ${sel === m ? 'bg-host-navy text-white border-host-navy' : 'bg-white text-host-navy hover:bg-gray-50'}`}>
-            {mrefLabel(m)}
-          </button>
-        ))}
+      {/* Navegação compacta */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <button onClick={() => setAberto((v) => !v)}
+          className={`px-3 py-2 rounded-lg text-sm font-semibold border ${aberto ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'}`}>
+          {aberto ? '← Voltar aos meses' : '⚠ Em aberto (por pagar)'}
+        </button>
+        {!aberto && (
+          <div className="flex items-center gap-1">
+            <button onClick={irAnterior} disabled={idx >= meses.length - 1} className="px-2 py-2 rounded-lg border bg-white disabled:opacity-30">◀</button>
+            <select value={sel} onChange={(e) => { setSel(e.target.value); setLink('') }}
+              className="px-3 py-2 rounded-lg border bg-white text-sm font-semibold text-host-navy min-w-[180px]">
+              {anos.map((y) => (
+                <optgroup key={y} label={String(y)}>
+                  {porAno[y].map((m) => <option key={m} value={m}>{mrefLabel(m)}</option>)}
+                </optgroup>
+              ))}
+            </select>
+            <button onClick={irSeguinte} disabled={idx <= 0} className="px-2 py-2 rounded-lg border bg-white disabled:opacity-30">▶</button>
+          </div>
+        )}
+        <div className="ml-auto flex items-center gap-4 text-sm">
+          <span className="text-gray-500">Comissão <b className="text-host-navy">{eur(totComissao)}</b></span>
+          <span className="text-gray-500">Pago <b className="text-green-700">{eur(totPago)}</b></span>
+          <span className="text-gray-500">Por pagar <b className="text-amber-600">{eur(porPagar)}</b></span>
+        </div>
       </div>
 
       {link && (
@@ -99,71 +127,72 @@ export default function Painel() {
         </div>
       )}
 
-      <div className="bg-white rounded-xl border overflow-x-auto">
-        <table className="w-full text-sm whitespace-nowrap">
+      <div className="bg-white rounded-xl border">
+        <table className="w-full table-fixed text-[13px]">
+          <colgroup>
+            <col className="w-[8%]" /><col className="w-[8%]" /><col className="w-[16%]" /><col className="w-[15%]" />
+            <col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" /><col className="w-[9%]" /><col className="w-[15%]" />
+          </colgroup>
           <thead>
             <tr className="text-left text-gray-500 border-b">
-              <th className="px-3 py-2 font-medium">Nº</th>
-              <th className="px-3 py-2 font-medium">Data</th>
-              <th className="px-3 py-2 font-medium">Cliente</th>
-              <th className="px-3 py-2 font-medium">Produto</th>
-              <th className="px-3 py-2 font-medium text-right">Valor</th>
-              <th className="px-3 py-2 font-medium text-right">%</th>
-              <th className="px-3 py-2 font-medium text-right">Comissão</th>
-              <th className="px-3 py-2 font-medium text-right">Valor pago</th>
-              <th className="px-3 py-2 font-medium">Estado</th>
-              <th className="px-3 py-2 font-medium">Observações</th>
+              <th className="px-2 py-2 font-medium">Nº</th>
+              <th className="px-2 py-2 font-medium">Data</th>
+              <th className="px-2 py-2 font-medium">Cliente</th>
+              <th className="px-2 py-2 font-medium">Produto</th>
+              <th className="px-2 py-2 font-medium text-right">Valor</th>
+              <th className="px-2 py-2 font-medium text-right">Comissão</th>
+              <th className="px-2 py-2 font-medium text-right">Pago</th>
+              <th className="px-2 py-2 font-medium">Estado</th>
+              <th className="px-2 py-2 font-medium">Obs.</th>
             </tr>
           </thead>
           <tbody>
             {visiveis.length === 0 && (
-              <tr><td colSpan={10} className="px-3 py-8 text-center text-gray-400">Sem comissões neste mês. Adiciona uma linha em baixo.</td></tr>
+              <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">Sem comissões. Adiciona uma linha em baixo.</td></tr>
             )}
             {visiveis.map((c) => {
-              const trans = c.mes_referencia !== sel
+              const trans = c.mes_referencia !== sel || aberto
               return (
                 <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-1.5 truncate" title={c.numero_projeto}>
                     {c.numero_projeto}
-                    {trans && <span className="ml-2 text-[10px] uppercase bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">transitada {mrefLabel(c.mes_referencia)}</span>}
+                    {trans && <span className="ml-1 text-[9px] uppercase bg-amber-100 text-amber-700 px-1 py-0.5 rounded" title={`transitada de ${mrefLabel(c.mes_referencia)}`}>↪{parseMref(c.mes_referencia).year % 100}</span>}
                   </td>
-                  <td className="px-3 py-2">{fmtDate(c.data_adjudicacao)}</td>
-                  <td className="px-3 py-2">{c.cliente?.nome}</td>
-                  <td className="px-3 py-2">{c.produto?.tipo}{c.is_saas && c.valor_mensal_saas ? <span className="text-gray-400"> ({eur(c.valor_mensal_saas)}/mês)</span> : null}</td>
-                  <td className="px-3 py-2 text-right">{eur(c.valor_venda)}</td>
-                  <td className="px-3 py-2 text-right">{Number(c.percentagem)}%</td>
-                  <td className="px-3 py-2 text-right font-semibold">{eur(c.comissao_calculada)}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
+                  <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
+                  <td className="px-2 py-1.5 truncate" title={`${c.produto?.tipo} (${Number(c.percentagem)}%)`}>
+                    {c.produto?.tipo} <span className="text-gray-400">{Number(c.percentagem)}%</span>
+                  </td>
+                  <td className="px-2 py-1.5 text-right whitespace-nowrap">{eur(c.valor_venda)}</td>
+                  <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
+                  <td className="px-2 py-1.5 text-right">
                     <input type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
                       onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) patch(c, { valor_pago: v }) }}
-                      className="w-24 text-right border rounded px-2 py-1" />
+                      className="w-full text-right border rounded px-1 py-1" />
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="px-2 py-1.5">
                     <select value={c.estado} onChange={(e) => patch(c, { estado: e.target.value as Estado })}
-                      className={`rounded px-2 py-1 text-xs font-medium ${estadoCls[c.estado]}`}>
+                      className={`w-full rounded px-1 py-1 text-xs font-medium ${estadoCls[c.estado]}`}>
                       {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </td>
-                  <td className="px-3 py-2">
-                    <input defaultValue={c.observacoes ?? ''} placeholder="—"
+                  <td className="px-2 py-1.5">
+                    <input defaultValue={c.observacoes ?? ''} placeholder="—" title={c.observacoes ?? ''}
                       onBlur={(e) => { if (e.target.value !== (c.observacoes ?? '')) patch(c, { observacoes: e.target.value }) }}
-                      className="w-48 border rounded px-2 py-1" />
+                      className="w-full border rounded px-1 py-1" />
                   </td>
                 </tr>
               )
             })}
           </tbody>
-          <tfoot>
-            <NovaLinha produtos={produtos} clientes={clientes} mes={sel} onAdd={carregar} />
-            <tr className="border-t bg-gray-50 font-semibold">
-              <td className="px-3 py-2" colSpan={6}>Totais ({visiveis.length} linhas)</td>
-              <td className="px-3 py-2 text-right">{eur(totComissao)}</td>
-              <td className="px-3 py-2 text-right">{eur(totPago)}</td>
-              <td className="px-3 py-2 text-xs text-gray-500" colSpan={2}>Por pagar: {eur(porPagar)}</td>
-            </tr>
-          </tfoot>
+          {!aberto && (
+            <tfoot>
+              <NovaLinha produtos={produtos} clientes={clientes} mes={sel} onAdd={carregar} />
+            </tfoot>
+          )}
         </table>
       </div>
+      <p className="text-xs text-gray-400 mt-2">{visiveis.length} linhas{!aberto && transitadas.length > 0 ? ` · ${transitadas.length} transitadas de meses anteriores` : ''}</p>
     </div>
   )
 }
@@ -182,7 +211,7 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
   const prod = produtos.find((p) => p.id === prodId)
   useEffect(() => { if (prod) setIsSaas(/saas/i.test(prod.tipo)) }, [prodId])
 
-  const valorVenda = isSaas ? (Number(mensal || 0) * 12) : Number(valor || 0)
+  const valorVenda = isSaas ? Number(mensal || 0) * 12 : Number(valor || 0)
   const pctv = prod ? Number(prod.percentagem_comissao) : 0
   const comissao = Math.round(valorVenda * pctv) / 100
 
@@ -204,33 +233,33 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
   }
 
   return (
-    <tr className="border-t-2 border-host-blue/30 bg-blue-50/40 align-top">
-      <td className="px-3 py-2"><input value={nro} onChange={(e) => setNro(e.target.value)} placeholder="Nº proj." className="w-20 border rounded px-2 py-1" /></td>
-      <td className="px-3 py-2"><input type="date" value={data} onChange={(e) => setData(e.target.value)} className="border rounded px-2 py-1" /></td>
-      <td className="px-3 py-2">
-        <input list="clientes-list" value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Cliente" className="w-40 border rounded px-2 py-1" />
+    <tr className="border-t-2 border-host-blue/30 bg-blue-50/40">
+      <td className="px-2 py-1.5"><input value={nro} onChange={(e) => setNro(e.target.value)} placeholder="Nº" className="w-full border rounded px-1 py-1" /></td>
+      <td className="px-2 py-1.5"><input type="date" value={data} onChange={(e) => setData(e.target.value)} className="w-full border rounded px-1 py-1" /></td>
+      <td className="px-2 py-1.5">
+        <input list="clientes-list" value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Cliente" className="w-full border rounded px-1 py-1" />
         <datalist id="clientes-list">{clientes.map((c) => <option key={c.id} value={c.nome} />)}</datalist>
       </td>
-      <td className="px-3 py-2">
-        <select value={prodId} onChange={(e) => setProdId(e.target.value)} className="border rounded px-2 py-1">
+      <td className="px-2 py-1.5">
+        <select value={prodId} onChange={(e) => setProdId(e.target.value)} className="w-full border rounded px-1 py-1">
           <option value="">Produto…</option>
           {produtos.map((p) => <option key={p.id} value={p.id}>{p.tipo} ({Number(p.percentagem_comissao)}%)</option>)}
         </select>
-        <label className="ml-2 text-xs text-gray-500"><input type="checkbox" checked={isSaas} onChange={(e) => setIsSaas(e.target.checked)} /> SaaS</label>
       </td>
-      <td className="px-3 py-2 text-right">
+      <td className="px-2 py-1.5 text-right">
         {isSaas
-          ? <input type="number" value={mensal} onChange={(e) => setMensal(e.target.value)} placeholder="€/mês" className="w-20 text-right border rounded px-2 py-1" />
-          : <input type="number" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="valor" className="w-24 text-right border rounded px-2 py-1" />}
+          ? <input type="number" value={mensal} onChange={(e) => setMensal(e.target.value)} placeholder="€/mês" className="w-full text-right border rounded px-1 py-1" />
+          : <input type="number" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="valor" className="w-full text-right border rounded px-1 py-1" />}
       </td>
-      <td className="px-3 py-2 text-right text-gray-500">{pctv}%</td>
-      <td className="px-3 py-2 text-right font-semibold">{eur(comissao)}</td>
-      <td className="px-3 py-2"></td>
-      <td className="px-3 py-2"></td>
-      <td className="px-3 py-2">
-        <div className="flex gap-2">
-          <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Obs." className="w-32 border rounded px-2 py-1" />
-          <button onClick={adicionar} disabled={busy} className="bg-host-blue text-white text-xs font-semibold rounded px-3 py-1 hover:opacity-90 whitespace-nowrap">+ Nova Linha</button>
+      <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">
+        {eur(comissao)}<label className="block text-[10px] text-gray-400 font-normal"><input type="checkbox" checked={isSaas} onChange={(e) => setIsSaas(e.target.checked)} /> SaaS ×12</label>
+      </td>
+      <td className="px-2 py-1.5"></td>
+      <td className="px-2 py-1.5"></td>
+      <td className="px-2 py-1.5">
+        <div className="flex gap-1">
+          <input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Obs." className="w-full border rounded px-1 py-1" />
+          <button onClick={adicionar} disabled={busy} className="bg-host-blue text-white text-xs font-semibold rounded px-2 py-1 hover:opacity-90 whitespace-nowrap">+ Linha</button>
         </div>
       </td>
     </tr>

@@ -66,4 +66,6 @@ export interface Envio {
   estado: string
   total_comissoes: number
   comissao_ids: string[]
+  bonus: number
+  bonus_descricao: string | null
 }
