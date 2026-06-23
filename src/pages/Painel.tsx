@@ -87,6 +87,22 @@ export default function Painel() {
     await carregar()
   }
 
+  async function definirLink(c: Comissao) {
+    const atual = links[c.numero_projeto] ? platformUrl(links[c.numero_projeto]) : ''
+    const url = window.prompt(`Cola o link da plataforma para o projeto ${c.numero_projeto}:`, atual)
+    if (url == null) return
+    if (url.trim() === '') { // limpar
+      await supabase.from('projeto_links').delete().eq('numero_projeto', c.numero_projeto)
+      setLinks((prev) => { const n = { ...prev }; delete n[c.numero_projeto]; return n })
+      return
+    }
+    const m = url.match(/data=(\d+)/)
+    if (!m) { alert('Link inválido — tem de conter "data=…".'); return }
+    const { error } = await supabase.from('projeto_links').upsert({ numero_projeto: c.numero_projeto, data_id: m[1] }, { onConflict: 'numero_projeto' })
+    if (error) { alert('Erro: ' + error.message); return }
+    setLinks((prev) => ({ ...prev, [c.numero_projeto]: m[1] }))
+  }
+
   async function gerarLink() {
     const ids = visiveis.map((c) => c.id)
     const { data, error } = await supabase
@@ -184,10 +200,10 @@ export default function Painel() {
               const trans = c.mes_referencia !== sel || aberto
               return (
                 <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-2 py-1.5 truncate" title={c.numero_projeto}>
+                  <td className="px-2 py-1.5 truncate" title="Duplo-clique para definir/editar o link da plataforma" onDoubleClick={() => definirLink(c)}>
                     {links[c.numero_projeto]
                       ? <a href={platformUrl(links[c.numero_projeto])} target="_blank" rel="noreferrer" className="text-host-blue hover:underline">{c.numero_projeto}</a>
-                      : c.numero_projeto}
+                      : <span className="border-b border-dashed border-gray-300 cursor-pointer">{c.numero_projeto}</span>}
                     {trans && <span className="ml-1 text-[9px] uppercase bg-amber-100 text-amber-700 px-1 py-0.5 rounded" title={`transitada de ${mrefLabel(c.mes_referencia)}`}>↪{parseMref(c.mes_referencia).year % 100}</span>}
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
