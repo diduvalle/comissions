@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import type { Comissao, Definicoes, Envio, Estado } from '../types'
-import { eur, fmtDate, mrefLabel } from '../utils'
+import { eur, fmtDate, mrefLabel, platformUrl } from '../utils'
 import { updateComissao } from '../data'
 
 const estadoCls: Record<Estado, string> = {
@@ -21,6 +21,7 @@ export default function Validacao() {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
   const [revMsg, setRevMsg] = useState('')
+  const [links, setLinks] = useState<Record<string, string>>({})
 
   async function carregar() {
     setLoading(true)
@@ -35,6 +36,8 @@ export default function Validacao() {
     ])
     setDef(d as any)
     setLinhas((c as any) || [])
+    const { data: lk } = await supabase.from('projeto_links').select('numero_projeto,data_id')
+    setLinks(Object.fromEntries(((lk as any) || []).map((x: any) => [x.numero_projeto, x.data_id])))
     setLoading(false)
   }
   useEffect(() => { carregar() }, [token])
@@ -132,7 +135,11 @@ export default function Validacao() {
             <tbody>
               {linhas.map((c) => (
                 <tr key={c.id} className={`border-b last:border-0 hover:bg-gray-50 ${c.estado === 'paga' ? 'bg-green-50' : ''}`}>
-                  <td className="px-2 py-1.5 truncate" title={c.numero_projeto}>{c.numero_projeto}</td>
+                  <td className="px-2 py-1.5 truncate" title={c.numero_projeto}>
+                    {links[c.numero_projeto]
+                      ? <a href={platformUrl(links[c.numero_projeto])} target="_blank" rel="noreferrer" className="text-host-blue hover:underline">{c.numero_projeto}</a>
+                      : c.numero_projeto}
+                  </td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
                   <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
                   <td className="px-2 py-1.5 truncate" title={c.produto?.tipo}>{c.produto?.tipo}</td>

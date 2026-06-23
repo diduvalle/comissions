@@ -42,3 +42,8 @@ export function sortMrefsDesc(mrefs: string[]): string[] {
 export function emAberto(estado: string): boolean {
   return estado !== 'paga'
 }
+
+// Link para o projeto na plataforma HostPMS (data id interno).
+export function platformUrl(dataId: string): string {
+  return `https://platform.hostpms.com/?cmd=project&data=${dataId}&ConnectionName=hostassist`
+}

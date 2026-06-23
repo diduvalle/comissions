@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Comissao, Produto, Cliente, Estado } from '../types'
-import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref } from '../utils'
+import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl } from '../utils'
 import { updateComissao, getOrCreateCliente } from '../data'
 
 const ESTADOS: Estado[] = ['pendente', 'validada', 'paga']
@@ -27,17 +27,20 @@ export default function Painel() {
   const [tok, setTok] = useState('')
   const [envMsg, setEnvMsg] = useState('')
   const [editar, setEditar] = useState<Comissao | null>(null)
+  const [links, setLinks] = useState<Record<string, string>>({})
 
   async function carregar() {
     setLoading(true)
-    const [{ data: c }, { data: p }, { data: cl }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: cl }, { data: lk }] = await Promise.all([
       supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').order('data_adjudicacao'),
       supabase.from('produtos').select('*').order('ordem'),
       supabase.from('clientes').select('*').order('nome'),
+      supabase.from('projeto_links').select('numero_projeto,data_id'),
     ])
     setComissoes((c as any) || [])
     setProdutos((p as any) || [])
     setClientes((cl as any) || [])
+    setLinks(Object.fromEntries(((lk as any) || []).map((x: any) => [x.numero_projeto, x.data_id])))
     setLoading(false)
   }
   useEffect(() => { carregar() }, [])
@@ -178,7 +181,9 @@ export default function Painel() {
               return (
                 <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
                   <td className="px-2 py-1.5 truncate" title={c.numero_projeto}>
-                    {c.numero_projeto}
+                    {links[c.numero_projeto]
+                      ? <a href={platformUrl(links[c.numero_projeto])} target="_blank" rel="noreferrer" className="text-host-blue hover:underline">{c.numero_projeto}</a>
+                      : c.numero_projeto}
                     {trans && <span className="ml-1 text-[9px] uppercase bg-amber-100 text-amber-700 px-1 py-0.5 rounded" title={`transitada de ${mrefLabel(c.mes_referencia)}`}>↪{parseMref(c.mes_referencia).year % 100}</span>}
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
@@ -237,6 +242,7 @@ function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comis
   const [pctv, setPctv] = useState(Number(comissao.percentagem))
   const [estado, setEstado] = useState<Estado>(comissao.estado)
   const [obs, setObs] = useState(comissao.observacoes || '')
+  const [linkUrl, setLinkUrl] = useState('')
   const [busy, setBusy] = useState(false)
 
   const valorVenda = isSaas ? Number(mensal || 0) * 12 : Number(valor || 0)
@@ -252,6 +258,8 @@ function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comis
         is_saas: isSaas, valor_mensal_saas: isSaas ? Number(mensal || 0) : null,
         estado, observacoes: obs || null,
       } as any, 'gestor')
+      const m = linkUrl.match(/data=(\d+)/)
+      if (m) await supabase.from('projeto_links').upsert({ numero_projeto: nro, data_id: m[1] })
       onSaved(); onClose()
     } catch (e: any) { alert('Erro: ' + e.message) } finally { setBusy(false) }
   }
@@ -283,6 +291,9 @@ function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comis
             </select>
           </label>
           <label className="col-span-2">Observações<input value={obs} onChange={(e) => setObs(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
+          <label className="col-span-2">Link da plataforma (cola o URL — o nº fica clicável)
+            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://platform.hostpms.com/?cmd=project&data=…" className="mt-1 w-full border rounded px-2 py-1.5" />
+          </label>
         </div>
         <div className="flex items-center justify-between mt-4">
           <span className="text-sm text-gray-500">Comissão: <b className="text-host-navy">{eur(com)}</b></span>
