@@ -90,7 +90,7 @@ export default function Validacao() {
 
   const totComissao = linhas.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
   const totPago = linhas.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
-  const totalAPagar = totComissao + Number(bonus || 0)
+  const totalAPagar = totPago + Number(bonus || 0)
 
   return (
     <div className="min-h-screen bg-host-navy/5">
@@ -192,6 +192,7 @@ export default function Validacao() {
           </div>
           <div className="bg-host-navy text-white rounded-xl p-4 flex flex-col justify-center">
             <div className="flex justify-between text-sm text-white/70"><span>Total comissões ({linhas.length})</span><span>{eur(totComissao)}</span></div>
+            <div className="flex justify-between text-sm text-white/70"><span>Marcado para pagar</span><span>{eur(totPago)}</span></div>
             <div className="flex justify-between text-sm text-white/70"><span>Bónus</span><span>{eur(bonus)}</span></div>
             <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-white/20">
               <span>A pagar — {envio && mrefLabel(envio.mes_referencia)}</span><span>{eur(totalAPagar)}</span>

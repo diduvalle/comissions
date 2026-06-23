@@ -25,7 +25,8 @@ export default async function handler(req, res) {
       : []
 
     const totCom = linhas.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
-    const aPagar = totCom + Number(envio.bonus || 0)
+    const totPago = linhas.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
+    const aPagar = totPago + Number(envio.bonus || 0)
     const rows = linhas.map((c) => `
       <tr>
         <td style="padding:6px 8px;border-bottom:1px solid #eee">${c.numero_projeto}</td>
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
       </table>
       <p style="margin-top:16px;font-size:15px">
         Total comissões: <b>${eur(totCom)}</b><br>
+        Marcado para pagar: <b>${eur(totPago)}</b><br>
         Bónus: <b>${eur(envio.bonus)}</b><br>
         <span style="font-size:17px">A pagar (${mrefLabel(envio.mes_referencia)}): <b>${eur(aPagar)}</b></span>
       </p>
