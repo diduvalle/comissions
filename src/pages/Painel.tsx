@@ -26,6 +26,7 @@ export default function Painel() {
   const [link, setLink] = useState('')
   const [tok, setTok] = useState('')
   const [envMsg, setEnvMsg] = useState('')
+  const [editar, setEditar] = useState<Comissao | null>(null)
 
   async function carregar() {
     setLoading(true)
@@ -203,6 +204,7 @@ export default function Painel() {
                       <input defaultValue={c.observacoes ?? ''} placeholder="—" title={c.observacoes ?? ''}
                         onBlur={(e) => { if (e.target.value !== (c.observacoes ?? '')) patch(c, { observacoes: e.target.value }) }}
                         className="flex-1 min-w-0 border rounded px-1 py-1" />
+                      <button onClick={() => setEditar(c)} title="Editar linha" className="text-gray-400 hover:text-host-blue px-1 shrink-0">✎</button>
                       <button onClick={() => deleteLinha(c)} title="Apagar linha" className="text-red-400 hover:text-red-600 px-1 shrink-0">✕</button>
                     </div>
                   </td>
@@ -218,6 +220,78 @@ export default function Painel() {
         </table>
       </div>
       <p className="text-xs text-gray-400 mt-2">{visiveis.length} linhas{!aberto && transitadas.length > 0 ? ` · ${transitadas.length} transitadas de meses anteriores` : ''}</p>
+
+      {editar && <EditarLinha comissao={editar} produtos={produtos} clientes={clientes} onClose={() => setEditar(null)} onSaved={carregar} />}
+    </div>
+  )
+}
+
+function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comissao: Comissao; produtos: Produto[]; clientes: Cliente[]; onClose: () => void; onSaved: () => void }) {
+  const [nro, setNro] = useState(comissao.numero_projeto)
+  const [data, setData] = useState(comissao.data_adjudicacao)
+  const [cliente, setCliente] = useState(comissao.cliente?.nome || '')
+  const [prodId, setProdId] = useState(comissao.produto_id)
+  const [isSaas, setIsSaas] = useState(comissao.is_saas)
+  const [mensal, setMensal] = useState(comissao.valor_mensal_saas ? String(comissao.valor_mensal_saas) : '')
+  const [valor, setValor] = useState(!comissao.is_saas ? String(comissao.valor_venda) : '')
+  const [pctv, setPctv] = useState(Number(comissao.percentagem))
+  const [estado, setEstado] = useState<Estado>(comissao.estado)
+  const [obs, setObs] = useState(comissao.observacoes || '')
+  const [busy, setBusy] = useState(false)
+
+  const valorVenda = isSaas ? Number(mensal || 0) * 12 : Number(valor || 0)
+  const com = Math.round(valorVenda * pctv) / 100
+
+  async function guardar() {
+    setBusy(true)
+    try {
+      const cliente_id = await getOrCreateCliente(cliente)
+      await updateComissao(comissao, {
+        numero_projeto: nro, data_adjudicacao: data, cliente_id, produto_id: prodId,
+        valor_venda: valorVenda, percentagem: pctv, comissao_calculada: com,
+        is_saas: isSaas, valor_mensal_saas: isSaas ? Number(mensal || 0) : null,
+        estado, observacoes: obs || null,
+      } as any, 'gestor')
+      onSaved(); onClose()
+    } catch (e: any) { alert('Erro: ' + e.message) } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-host-navy mb-4">Editar linha</h3>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <label>Nº projeto<input value={nro} onChange={(e) => setNro(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
+          <label>Data<input type="date" value={data} onChange={(e) => setData(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
+          <label className="col-span-2">Cliente
+            <input list="clientes-edit" value={cliente} onChange={(e) => setCliente(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" />
+            <datalist id="clientes-edit">{clientes.map((c) => <option key={c.id} value={c.nome} />)}</datalist>
+          </label>
+          <label className="col-span-2">Produto
+            <select value={prodId} onChange={(e) => { setProdId(e.target.value); const p = produtos.find((x) => x.id === e.target.value); if (p) { setPctv(Number(p.percentagem_comissao)); setIsSaas(/saas/i.test(p.tipo)) } }} className="mt-1 w-full border rounded px-2 py-1.5">
+              {produtos.map((p) => <option key={p.id} value={p.id}>{p.tipo} ({Number(p.percentagem_comissao)}%)</option>)}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 col-span-2"><input type="checkbox" checked={isSaas} onChange={(e) => setIsSaas(e.target.checked)} /> É SaaS (valor = mensalidade × 12)</label>
+          {isSaas
+            ? <label>Mensalidade €/mês<input type="number" value={mensal} onChange={(e) => setMensal(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
+            : <label>Valor da venda<input type="number" value={valor} onChange={(e) => setValor(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>}
+          <label>Percentagem %<input type="number" step="0.5" value={pctv} onChange={(e) => setPctv(Number(e.target.value))} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
+          <label>Estado
+            <select value={estado} onChange={(e) => setEstado(e.target.value as Estado)} className="mt-1 w-full border rounded px-2 py-1.5">
+              {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </label>
+          <label className="col-span-2">Observações<input value={obs} onChange={(e) => setObs(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
+        </div>
+        <div className="flex items-center justify-between mt-4">
+          <span className="text-sm text-gray-500">Comissão: <b className="text-host-navy">{eur(com)}</b></span>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm">Cancelar</button>
+            <button onClick={guardar} disabled={busy} className="px-4 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold">Guardar</button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

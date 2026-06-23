@@ -25,6 +25,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           />
           <nav className="flex items-center gap-1">
             {tab('/', 'Painel')}
+            {tab('/envios', 'Envios')}
             {tab('/definicoes', 'Definições')}
           </nav>
         </div>

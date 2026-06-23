@@ -3,6 +3,7 @@ import PinGate from './components/PinGate'
 import Layout from './components/Layout'
 import Painel from './pages/Painel'
 import Definicoes from './pages/Definicoes'
+import Envios from './pages/Envios'
 import Validacao from './pages/Validacao'
 
 export default function App() {
@@ -15,6 +16,16 @@ export default function App() {
           <PinGate>
             <Layout>
               <Painel />
+            </Layout>
+          </PinGate>
+        }
+      />
+      <Route
+        path="/envios"
+        element={
+          <PinGate>
+            <Layout>
+              <Envios />
             </Layout>
           </PinGate>
         }

@@ -20,6 +20,7 @@ export default function Validacao() {
   const [bonusNota, setBonusNota] = useState('')
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
+  const [revMsg, setRevMsg] = useState('')
 
   async function carregar() {
     setLoading(true)
@@ -47,6 +48,23 @@ export default function Validacao() {
   async function guardarBonus(valor: number, nota: string) {
     if (!envio) return
     await supabase.from('envios').update({ bonus: valor, bonus_descricao: nota }).eq('id', envio.id)
+  }
+
+  function adicionarNota(c: Comissao, texto: string) {
+    const t = texto.trim()
+    if (!t) return
+    const stamp = new Date().toLocaleDateString('pt-PT')
+    const novo = (c.observacoes ? c.observacoes + '\n' : '') + `[${stamp}] ${t}`
+    patch(c, { observacoes: novo })
+  }
+
+  async function enviarRevisto() {
+    setRevMsg('A submeter…')
+    try {
+      const r = await fetch('/api/revisto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+      const out = await r.json()
+      setRevMsg(r.ok ? `✓ Revisto submetido ao Diogo (a pagar ${eur(out.aPagar)})` : `Erro: ${out.error}`)
+    } catch (e: any) { setRevMsg('Erro: ' + e.message) }
   }
 
   async function marcarTodas(estado: Estado) {
@@ -131,9 +149,10 @@ export default function Validacao() {
                       <option value="paga">paga</option>
                     </select>
                   </td>
-                  <td className="px-2 py-1.5">
-                    <input defaultValue={c.observacoes ?? ''} placeholder="—" title={c.observacoes ?? ''}
-                      onBlur={(e) => { if (e.target.value !== (c.observacoes ?? '')) patch(c, { observacoes: e.target.value }) }}
+                  <td className="px-2 py-1.5 align-top">
+                    {c.observacoes && <div className="text-[11px] text-gray-600 whitespace-pre-wrap mb-1 max-h-20 overflow-auto">{c.observacoes}</div>}
+                    <input placeholder="+ nota…"
+                      onKeyDown={(e) => { if (e.key === 'Enter') { adicionarNota(c, (e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = '' } }}
                       className="w-full border rounded px-1 py-1" />
                   </td>
                 </tr>
@@ -166,6 +185,14 @@ export default function Validacao() {
               <span>A pagar — {envio && mrefLabel(envio.mes_referencia)}</span><span>{eur(totalAPagar)}</span>
             </div>
           </div>
+        </div>
+
+        <div className="mt-6 flex flex-col items-center gap-2">
+          <button onClick={enviarRevisto} className="bg-green-600 text-white font-semibold rounded-lg px-6 py-3 hover:opacity-90">
+            ✓ Revisto — submeter ao Diogo
+          </button>
+          {revMsg && <span className="text-sm text-gray-600">{revMsg}</span>}
+          <span className="text-xs text-gray-400">Envia ao Diogo o ponto de situação e o total a pagar deste mês.</span>
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6 italic">Move beyond expectations.</p>
