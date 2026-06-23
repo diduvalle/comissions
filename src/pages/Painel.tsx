@@ -24,6 +24,8 @@ export default function Painel() {
   const [aberto, setAberto] = useState(false)
   const [loading, setLoading] = useState(true)
   const [link, setLink] = useState('')
+  const [tok, setTok] = useState('')
+  const [envMsg, setEnvMsg] = useState('')
 
   async function carregar() {
     setLoading(true)
@@ -76,7 +78,18 @@ export default function Painel() {
       .from('envios').insert({ mes_referencia: sel, comissao_ids: ids, total_comissoes: totComissao })
       .select('token').single()
     if (error) { alert('Erro: ' + error.message); return }
+    setTok(data.token)
+    setEnvMsg('')
     setLink(`${window.location.origin}/validacao/${data.token}`)
+  }
+
+  async function enviarEmail() {
+    setEnvMsg('A enviar…')
+    try {
+      const r = await fetch('/api/enviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: tok }) })
+      const out = await r.json()
+      setEnvMsg(r.ok ? `✓ Email enviado para ${out.to}` : `Erro: ${out.error}`)
+    } catch (e: any) { setEnvMsg('Erro: ' + e.message) }
   }
 
   if (loading) return <div className="text-gray-500">A carregar…</div>
@@ -124,6 +137,8 @@ export default function Painel() {
           <span className="font-medium text-host-navy">Link para o Marco:</span>
           <input readOnly value={link} className="flex-1 bg-white border rounded px-2 py-1 text-xs" onFocus={(e) => e.target.select()} />
           <button onClick={() => navigator.clipboard.writeText(link)} className="text-host-blue font-semibold">Copiar</button>
+          <button onClick={enviarEmail} className="bg-host-blue text-white font-semibold rounded px-3 py-1.5">Enviar ao Marco</button>
+          {envMsg && <span className="text-xs text-gray-600">{envMsg}</span>}
         </div>
       )}
 
