@@ -74,7 +74,8 @@ export default function Validacao() {
       const metade = Math.round(Number(c.comissao_calculada || 0) * 50) / 100
       patch(c, { partilhada: true, valor_pago: metade, estado: 'paga' })
     } else {
-      patch(c, { partilhada: false, estado: estadoAuto({ ...c, partilhada: false }, Number(c.valor_pago || 0)) })
+      // desativar partilha → volta a zero (comissão por pagar a 100%)
+      patch(c, { partilhada: false, valor_pago: null, estado: 'pendente' })
     }
   }
 
