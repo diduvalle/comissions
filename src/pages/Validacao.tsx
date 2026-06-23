@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import type { Comissao, Definicoes, Envio, Estado } from '../types'
@@ -22,6 +22,7 @@ export default function Validacao() {
   const [erro, setErro] = useState('')
   const [revMsg, setRevMsg] = useState('')
   const [links, setLinks] = useState<Record<string, string>>({})
+  const registado = useRef(false)
 
   async function carregar() {
     setLoading(true)
@@ -30,6 +31,10 @@ export default function Validacao() {
     setEnvio(e as any)
     setBonus(Number((e as any).bonus || 0))
     setBonusNota((e as any).bonus_descricao || '')
+    if (!registado.current) {
+      registado.current = true
+      supabase.from('envios').update({ aberto_em: (e as any).aberto_em || new Date().toISOString(), aberto_contagem: ((e as any).aberto_contagem || 0) + 1 }).eq('id', (e as any).id)
+    }
     const [{ data: d }, { data: c }] = await Promise.all([
       supabase.from('definicoes').select('*').eq('id', 1).single(),
       supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').in('id', (e as any).comissao_ids),

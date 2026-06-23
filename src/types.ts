@@ -73,4 +73,8 @@ export interface Envio {
   comissao_ids: string[]
   bonus: number
   bonus_descricao: string | null
+  enviado_por: string | null
+  enviado_para: string | null
+  aberto_em: string | null
+  aberto_contagem: number
 }

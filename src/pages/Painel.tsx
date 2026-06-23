@@ -27,20 +27,24 @@ export default function Painel() {
   const [tok, setTok] = useState('')
   const [envMsg, setEnvMsg] = useState('')
   const [editar, setEditar] = useState<Comissao | null>(null)
+  const [copiadoP, setCopiadoP] = useState(false)
   const [links, setLinks] = useState<Record<string, string>>({})
+  const [def, setDef] = useState<{ gestor_nome?: string; diretor_email?: string } | null>(null)
 
   async function carregar() {
     setLoading(true)
-    const [{ data: c }, { data: p }, { data: cl }, { data: lk }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: cl }, { data: lk }, { data: d }] = await Promise.all([
       supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').order('data_adjudicacao'),
       supabase.from('produtos').select('*').order('ordem'),
       supabase.from('clientes').select('*').order('nome'),
       supabase.from('projeto_links').select('numero_projeto,data_id'),
+      supabase.from('definicoes').select('gestor_nome,diretor_email').eq('id', 1).single(),
     ])
     setComissoes((c as any) || [])
     setProdutos((p as any) || [])
     setClientes((cl as any) || [])
     setLinks(Object.fromEntries(((lk as any) || []).map((x: any) => [x.numero_projeto, x.data_id])))
+    setDef((d as any) || null)
     setLoading(false)
   }
   useEffect(() => { carregar() }, [])
@@ -86,7 +90,7 @@ export default function Painel() {
   async function gerarLink() {
     const ids = visiveis.map((c) => c.id)
     const { data, error } = await supabase
-      .from('envios').insert({ mes_referencia: sel, comissao_ids: ids, total_comissoes: totComissao })
+      .from('envios').insert({ mes_referencia: sel, comissao_ids: ids, total_comissoes: totComissao, enviado_por: def?.gestor_nome || 'Diogo Vale', enviado_para: def?.diretor_email || 'marco.arroz@hostpms.com' })
       .select('token').single()
     if (error) { alert('Erro: ' + error.message); return }
     setTok(data.token)
@@ -147,7 +151,7 @@ export default function Painel() {
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm flex items-center gap-3">
           <span className="font-medium text-host-navy">Link para o Marco:</span>
           <input readOnly value={link} className="flex-1 bg-white border rounded px-2 py-1 text-xs" onFocus={(e) => e.target.select()} />
-          <button onClick={() => navigator.clipboard.writeText(link)} className="text-host-blue font-semibold">Copiar</button>
+          <button onClick={() => { navigator.clipboard.writeText(link); setCopiadoP(true); setTimeout(() => setCopiadoP(false), 2000) }} className="text-host-blue font-semibold">{copiadoP ? '✓ Copiado!' : 'Copiar'}</button>
           <button onClick={enviarEmail} className="bg-host-blue text-white font-semibold rounded px-3 py-1.5">Enviar ao Marco</button>
           {envMsg && <span className="text-xs text-gray-600">{envMsg}</span>}
         </div>
