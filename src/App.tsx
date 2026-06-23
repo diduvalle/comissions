@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import PinGate from './components/PinGate'
 import Layout from './components/Layout'
 import Painel from './pages/Painel'
+import Resumo from './pages/Resumo'
 import Definicoes from './pages/Definicoes'
 import Envios from './pages/Envios'
 import Validacao from './pages/Validacao'
@@ -16,6 +17,16 @@ export default function App() {
           <PinGate>
             <Layout>
               <Painel />
+            </Layout>
+          </PinGate>
+        }
+      />
+      <Route
+        path="/resumo"
+        element={
+          <PinGate>
+            <Layout>
+              <Resumo />
             </Layout>
           </PinGate>
         }
