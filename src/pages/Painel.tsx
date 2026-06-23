@@ -193,16 +193,11 @@ export default function Painel() {
                   </td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap">{eur(c.valor_venda)}</td>
                   <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
-                  <td className="px-2 py-1.5 text-right">
-                    <input type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
-                      onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) patch(c, { valor_pago: v }) }}
-                      className="w-full text-right border rounded px-1 py-1" />
+                  <td className="px-2 py-1.5 text-right text-gray-500" title="Preenchido pelo diretor">
+                    {c.valor_pago != null ? eur(c.valor_pago) : '—'}
                   </td>
                   <td className="px-2 py-1.5">
-                    <select value={c.estado} onChange={(e) => patch(c, { estado: e.target.value as Estado })}
-                      className={`w-full rounded px-1 py-1 text-xs font-medium ${estadoCls[c.estado]}`}>
-                      {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <span className={`inline-block w-full text-center rounded px-1 py-1 text-xs font-medium ${estadoCls[c.estado]}`}>{c.estado}</span>
                   </td>
                   <td className="px-2 py-1.5">
                     <div className="flex items-center gap-1">
