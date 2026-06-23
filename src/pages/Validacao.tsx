@@ -122,8 +122,8 @@ export default function Validacao() {
         <div className="bg-white rounded-xl border">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[18%]" /><col className="w-[15%]" />
-              <col className="w-[11%]" /><col className="w-[11%]" /><col className="w-[10%]" /><col className="w-[18%]" />
+              <col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[16%]" /><col className="w-[14%]" />
+              <col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" /><col className="w-[15%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -131,6 +131,7 @@ export default function Validacao() {
                 <th className="px-2 py-2 font-medium">Data</th>
                 <th className="px-2 py-2 font-medium">Cliente</th>
                 <th className="px-2 py-2 font-medium">Produto</th>
+                <th className="px-2 py-2 font-medium text-right">Valor</th>
                 <th className="px-2 py-2 font-medium text-right">Comissão</th>
                 <th className="px-2 py-2 font-medium text-right">Valor pago</th>
                 <th className="px-2 py-2 font-medium">Estado</th>
@@ -147,7 +148,8 @@ export default function Validacao() {
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
                   <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
-                  <td className="px-2 py-1.5 truncate" title={c.produto?.tipo}>{c.produto?.tipo}</td>
+                  <td className="px-2 py-1.5 truncate" title={`${c.produto?.tipo} (${Number(c.percentagem)}%)`}>{c.produto?.tipo} <span className="text-gray-400">{Number(c.percentagem)}%</span></td>
+                  <td className="px-2 py-1.5 text-right whitespace-nowrap" title={c.is_saas && c.valor_mensal_saas ? `${eur(c.valor_mensal_saas)}/mês × 12` : ''}>{eur(c.valor_venda)}</td>
                   <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
                   <td className="px-2 py-1.5 text-right">
                     <input type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
