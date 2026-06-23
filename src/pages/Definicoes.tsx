@@ -21,6 +21,21 @@ export default function Definicoes() {
   const [novoTipo, setNovoTipo] = useState('')
   const [novoPct, setNovoPct] = useState('')
   const [msg, setMsg] = useState('')
+  const [linksText, setLinksText] = useState('')
+  const [linksMsg, setLinksMsg] = useState('')
+
+  async function importarLinks() {
+    const linhas = linksText.split('\n').map((l) => l.trim()).filter(Boolean)
+    const rows: { numero_projeto: string; data_id: string }[] = []
+    for (const l of linhas) {
+      const mm = l.match(/(\d{4,6})\D+data=(\d+)/)
+      if (mm) rows.push({ numero_projeto: mm[1], data_id: mm[2] })
+    }
+    if (!rows.length) { setLinksMsg('Nenhuma linha válida. Formato: «22182 https://…data=12074…» (nº seguido do URL).'); return }
+    const { error } = await supabase.from('projeto_links').upsert(rows, { onConflict: 'numero_projeto' })
+    setLinksMsg(error ? 'Erro: ' + error.message : `✓ ${rows.length} links importados.`)
+    if (!error) setLinksText('')
+  }
 
   async function carregar() {
     const [{ data: d }, { data: p }] = await Promise.all([
@@ -119,6 +134,21 @@ export default function Definicoes() {
               <p className="text-[10px] text-gray-400 mt-3">Host Hotel Systems · Move beyond expectations.</p>
             </div>
           </div>
+        </div>
+      </Section>
+
+      {/* Links da plataforma */}
+      <Section title="Links da plataforma (nº de projeto clicável)">
+        <p className="text-sm text-gray-500 mb-3">
+          Cola uma linha por projeto, com o <b>nº</b> seguido do <b>URL</b> da plataforma. Exemplo:<br />
+          <code className="text-xs">22182 https://platform.hostpms.com/?cmd=project&amp;data=12074&amp;ConnectionName=hostassist</code>
+        </p>
+        <textarea value={linksText} onChange={(e) => setLinksText(e.target.value)} rows={6}
+          placeholder={'22182 https://platform.hostpms.com/?cmd=project&data=12074&...\n22244 https://platform.hostpms.com/?cmd=project&data=12147&...'}
+          className="w-full border rounded px-2 py-1.5 font-mono text-xs" />
+        <div className="flex items-center gap-3 mt-2">
+          <button onClick={importarLinks} className="bg-host-blue text-white text-sm font-semibold rounded px-4 py-2">Importar links</button>
+          {linksMsg && <span className="text-sm text-gray-600">{linksMsg}</span>}
         </div>
       </Section>
 
