@@ -39,8 +39,9 @@ export default function Validacao() {
   useEffect(() => { carregar() }, [token])
 
   async function patch(c: Comissao, p: Partial<Comissao>) {
-    await updateComissao(c, p, 'diretor')
-    await carregar()
+    // atualização otimista (sem reload da página) — fluxo ágil
+    setLinhas((prev) => prev.map((x) => (x.id === c.id ? { ...x, ...p } : x)))
+    try { await updateComissao(c, p, 'diretor') } catch (e: any) { alert('Erro: ' + e.message); carregar() }
   }
 
   async function guardarBonus(valor: number, nota: string) {
@@ -112,7 +113,7 @@ export default function Validacao() {
             </thead>
             <tbody>
               {linhas.map((c) => (
-                <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
+                <tr key={c.id} className={`border-b last:border-0 hover:bg-gray-50 ${c.estado === 'paga' ? 'bg-green-50' : ''}`}>
                   <td className="px-2 py-1.5 truncate" title={c.numero_projeto}>{c.numero_projeto}</td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
                   <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
@@ -161,8 +162,9 @@ export default function Validacao() {
           <div className="bg-host-navy text-white rounded-xl p-4 flex flex-col justify-center">
             <div className="flex justify-between text-sm text-white/70"><span>Total comissões ({linhas.length})</span><span>{eur(totComissao)}</span></div>
             <div className="flex justify-between text-sm text-white/70"><span>Bónus</span><span>{eur(bonus)}</span></div>
-            <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-white/20"><span>Total a pagar</span><span>{eur(totalAPagar)}</span></div>
-            <div className="flex justify-between text-xs text-white/50 mt-1"><span>Já pago</span><span>{eur(totPago)}</span></div>
+            <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-white/20">
+              <span>A pagar — {envio && mrefLabel(envio.mes_referencia)}</span><span>{eur(totalAPagar)}</span>
+            </div>
           </div>
         </div>
 

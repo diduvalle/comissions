@@ -72,6 +72,13 @@ export default function Painel() {
     await carregar()
   }
 
+  async function deleteLinha(c: Comissao) {
+    if (!confirm(`Apagar a linha ${c.numero_projeto} — ${c.cliente?.nome}?\nEsta ação não pode ser anulada.`)) return
+    const { error } = await supabase.from('comissoes').delete().eq('id', c.id)
+    if (error) { alert('Erro: ' + error.message); return }
+    await carregar()
+  }
+
   async function gerarLink() {
     const ids = visiveis.map((c) => c.id)
     const { data, error } = await supabase
@@ -192,9 +199,12 @@ export default function Painel() {
                     </select>
                   </td>
                   <td className="px-2 py-1.5">
-                    <input defaultValue={c.observacoes ?? ''} placeholder="—" title={c.observacoes ?? ''}
-                      onBlur={(e) => { if (e.target.value !== (c.observacoes ?? '')) patch(c, { observacoes: e.target.value }) }}
-                      className="w-full border rounded px-1 py-1" />
+                    <div className="flex items-center gap-1">
+                      <input defaultValue={c.observacoes ?? ''} placeholder="—" title={c.observacoes ?? ''}
+                        onBlur={(e) => { if (e.target.value !== (c.observacoes ?? '')) patch(c, { observacoes: e.target.value }) }}
+                        className="flex-1 min-w-0 border rounded px-1 py-1" />
+                      <button onClick={() => deleteLinha(c)} title="Apagar linha" className="text-red-400 hover:text-red-600 px-1 shrink-0">✕</button>
+                    </div>
                   </td>
                 </tr>
               )
