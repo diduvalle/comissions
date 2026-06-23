@@ -44,7 +44,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        from: 'Comissões <onboarding@resend.dev>',
+        from: 'Comissões (Diogo Vale) <diogo.vale@cr0x.org>',
         to: [def?.diretor_email],
         reply_to: 'diogo.vale@hostpms.com',
         subject, html,
