@@ -80,7 +80,9 @@ export default function Envios() {
                 </td>
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   <button onClick={() => copiar(e)} className="text-host-blue text-xs font-semibold mr-3">{copiado === e.id ? '✓ Copiado!' : 'Copiar link'}</button>
-                  <button onClick={() => apagar(e)} title="Apagar envio" className="text-red-400 hover:text-red-600">✕</button>
+                  {e.estado === 'concluido'
+                    ? <span title="Concluído pelo diretor — guardado para histórico (não pode ser apagado)" className="text-gray-400 cursor-default">🔒</span>
+                    : <button onClick={() => apagar(e)} title="Apagar envio" className="text-red-400 hover:text-red-600">✕</button>}
                 </td>
               </tr>
             ))}

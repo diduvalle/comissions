@@ -34,6 +34,14 @@ export function mrefLabel(mref: string): string {
   return parseMref(mref).label
 }
 
+// "JUN26" -> "JUL26"  (mês seguinte, salta o ano em dezembro)
+export function nextMref(mref: string): string {
+  const { month, year } = parseMref(mref)
+  const m = month === 12 ? 1 : month + 1
+  const y = month === 12 ? year + 1 : year
+  return `${ABBR[m]}${String(y).slice(2)}`
+}
+
 export function sortMrefsDesc(mrefs: string[]): string[] {
   return [...new Set(mrefs)].sort((a, b) => parseMref(b).order - parseMref(a).order)
 }

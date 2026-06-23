@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Comissao, Produto, Cliente, Estado } from '../types'
-import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl } from '../utils'
+import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl, nextMref } from '../utils'
 import { updateComissao, getOrCreateCliente } from '../data'
 
 const ESTADOS: Estado[] = ['pendente', 'parcial', 'paga']
@@ -30,26 +30,34 @@ export default function Painel() {
   const [copiadoP, setCopiadoP] = useState(false)
   const [links, setLinks] = useState<Record<string, string>>({})
   const [def, setDef] = useState<{ gestor_nome?: string; diretor_email?: string } | null>(null)
+  const [fechados, setFechados] = useState<string[]>([])
 
   async function carregar() {
     setLoading(true)
-    const [{ data: c }, { data: p }, { data: cl }, { data: lk }, { data: d }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: cl }, { data: lk }, { data: d }, { data: ev }] = await Promise.all([
       supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').order('data_adjudicacao'),
       supabase.from('produtos').select('*').order('ordem'),
       supabase.from('clientes').select('*').order('nome'),
       supabase.from('projeto_links').select('numero_projeto,data_id'),
       supabase.from('definicoes').select('gestor_nome,diretor_email').eq('id', 1).single(),
+      supabase.from('envios').select('mes_referencia,estado'),
     ])
     setComissoes((c as any) || [])
     setProdutos((p as any) || [])
     setClientes((cl as any) || [])
     setLinks(Object.fromEntries(((lk as any) || []).map((x: any) => [x.numero_projeto, x.data_id])))
     setDef((d as any) || null)
+    setFechados([...new Set(((ev as any) || []).filter((e: any) => e.estado === 'concluido').map((e: any) => e.mes_referencia))] as string[])
     setLoading(false)
   }
   useEffect(() => { carregar() }, [])
 
-  const meses = useMemo(() => sortMrefsDesc(comissoes.map((c) => c.mes_referencia)), [comissoes])
+  // meses dos dados + o mês SEGUINTE a cada mês concluído pelo diretor (novo ciclo aberto)
+  const meses = useMemo(
+    () => sortMrefsDesc([...comissoes.map((c) => c.mes_referencia), ...fechados.map(nextMref)]),
+    [comissoes, fechados],
+  )
+  const selFechado = fechados.includes(sel)
   useEffect(() => { if (!sel && meses.length) setSel(meses[0]) }, [meses, sel])
 
   // agrupar meses por ano para o seletor
@@ -129,10 +137,13 @@ export default function Painel() {
     <div>
       <div className="sticky top-14 z-30 bg-[#f5f7fb] -mx-6 px-6 pt-3 pb-3 border-b border-gray-200">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        <h1 className="text-2xl font-bold text-host-navy">Painel de comissões</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-host-navy">Painel de comissões</h1>
+          {!aberto && selFechado && <span title="O diretor já reviu e concluiu este mês" className="text-xs font-semibold rounded-full bg-green-100 text-green-700 px-2 py-1">🔒 concluído pelo diretor</span>}
+        </div>
         {!aberto && (
           <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-4 py-2 hover:opacity-90">
-            Enviar
+            {selFechado ? 'Reenviar' : 'Enviar'}
           </button>
         )}
       </div>
@@ -164,6 +175,11 @@ export default function Painel() {
         </div>
       </div>
 
+      {!aberto && proprias.length === 0 && transitadas.length > 0 && (
+        <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+          ↪ <b>Novo ciclo de {mrefLabel(sel)}.</b> {transitadas.length} comissão(ões) transitada(s) de meses anteriores, por pagar. Adiciona novas vendas em baixo, se as houver.
+        </div>
+      )}
       {link && (
         <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm flex items-center gap-3">
           <span className="font-medium text-host-navy">Link para o Marco:</span>
