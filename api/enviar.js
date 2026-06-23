@@ -31,12 +31,18 @@ export default async function handler(req, res) {
     const mes = mrefLabel(envio.mes_referencia)
     const n = String((envio.comissao_ids || []).length)
     const total = eur(envio.total_comissoes)
-    const subject = String(def?.email_assunto || 'Comissões para validação').split('{mes}').join(mes)
-    const corpo = String(def?.email_corpo || 'Segue o mapa de comissões para validação.')
-      .split('{mes}').join(mes).split('{n}').join(n).split('{total}').join(total).split('{link}').join(link)
+    const M = (s) => String(s || '').split('{mes}').join(mes).split('{n}').join(n).split('{total}').join(total).split('{link}').join(link).split('{diretor}').join(def?.diretor_nome || '')
+    const subject = M(def?.email_assunto || 'Comissões para validação — {mes}')
+
+    const saudacao = def?.email_saudacao ? `<p>${M(def.email_saudacao).replace(/\n/g, '<br>')}</p>` : ''
+    const resumo = def?.email_mostrar_resumo ? `<p style="background:#f3f6fc;border-radius:8px;padding:10px 14px"><b>${mes}</b> · ${n} linhas · total ${total}</p>` : ''
+    const corpoTxt = def?.email_corpo ? `<p>${M(def.email_corpo).replace(/\n/g, '<br>')}</p>` : ''
+    const assinatura = def?.email_assinatura ? `<p style="margin-top:18px">${M(def.email_assinatura).replace(/\n/g, '<br>')}</p>` : ''
+    const botao = `<p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#1E63FF;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">${def?.email_botao_label || 'Abrir mapa de comissões'}</a></p>`
+    const antes = (def?.email_botao_posicao === 'antes')
+
     const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0F1E2E;font-size:14px;line-height:1.6">
-      ${corpo.replace(/\n/g, '<br>')}
-      <p style="margin-top:20px"><a href="${link}" style="display:inline-block;background:#1E63FF;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">Abrir mapa de comissões</a></p>
+      ${saudacao}${resumo}${antes ? botao : ''}${corpoTxt}${antes ? '' : botao}${assinatura}
       <p style="color:#9aa4b2;font-size:12px;margin-top:24px">Host Hotel Systems · Move beyond expectations.</p>
     </div>`
 

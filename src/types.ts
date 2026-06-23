@@ -45,6 +45,11 @@ export interface Definicoes {
   diretor_email: string
   email_assunto: string
   email_corpo: string
+  email_saudacao: string
+  email_assinatura: string
+  email_mostrar_resumo: boolean
+  email_botao_label: string
+  email_botao_posicao: 'antes' | 'depois'
   pin: string
 }
 
