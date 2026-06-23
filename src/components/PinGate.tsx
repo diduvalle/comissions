@@ -47,10 +47,7 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-host-navy px-4">
       <form onSubmit={tentar} className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8 text-center">
-        <img
-          src="https://cdn.prod.website-files.com/69b142c7dd4ed4f68e7813f9/69b142c7dd4ed4f68e781685_Host_RGB%20(1).png"
-          alt="Host" className="h-9 mx-auto mb-6"
-        />
+        <img src="/host-color.png" alt="Host" className="h-9 mx-auto mb-6" />
         <h1 className="text-xl font-bold text-host-navy">Comissões</h1>
         <p className="text-sm text-gray-500 mb-6">Introduz o PIN para entrar.</p>
         <input

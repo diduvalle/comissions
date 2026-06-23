@@ -5,12 +5,12 @@ export default {
     extend: {
       colors: {
         host: {
-          blue: '#1E63FF',
-          navy: '#0F1E2E',
+          blue: '#0667FF',
+          navy: '#182633',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Poppins', 'system-ui', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
     },
   },

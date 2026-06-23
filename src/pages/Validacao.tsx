@@ -88,7 +88,7 @@ export default function Validacao() {
     <div className="min-h-screen bg-host-navy/5">
       <header className="bg-host-navy text-white">
         <div className="max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-4">
-          <img src="https://cdn.prod.website-files.com/69b142c7dd4ed4f68e7813f9/69b142c7dd4ed4f68e781635_Host_negative_RGB.png" alt="Host" className="h-7" />
+          <img src="/host-white.png" alt="Host" className="h-7" />
           <div className="ml-auto flex items-center gap-3">
             <img src="/gestora.jpg" alt={def?.gestor_nome || 'gestora'} className="h-11 w-11 rounded-full object-cover border-2 border-white/30"
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
