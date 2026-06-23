@@ -7,8 +7,20 @@ import { updateComissao } from '../data'
 
 const estadoCls: Record<Estado, string> = {
   pendente: 'bg-gray-100 text-gray-700',
-  validada: 'bg-blue-100 text-host-blue',
+  parcial: 'bg-orange-100 text-orange-700',
   paga: 'bg-green-100 text-green-700',
+}
+
+// valor que NÓS pagamos nesta linha (metade se for comissão partilhada 50/50)
+function devido(c: Comissao): number {
+  const com = Number(c.comissao_calculada || 0)
+  return c.partilhada ? Math.round(com * 50) / 100 : com
+}
+function estadoAuto(c: Comissao, pago: number): Estado {
+  const d = devido(c)
+  if (pago > 0 && pago >= d - 0.005) return 'paga'
+  if (pago > 0) return 'parcial'
+  return 'pendente'
 }
 
 export default function Validacao() {
@@ -53,6 +65,19 @@ export default function Validacao() {
     try { await updateComissao(c, p, 'diretor') } catch (e: any) { alert('Erro: ' + e.message); carregar() }
   }
 
+  function setPago(c: Comissao, v: number | null) {
+    patch(c, { valor_pago: v, estado: estadoAuto(c, Number(v || 0)) })
+  }
+
+  function togglePisco(c: Comissao) {
+    if (!c.partilhada) {
+      const metade = Math.round(Number(c.comissao_calculada || 0) * 50) / 100
+      patch(c, { partilhada: true, valor_pago: metade, estado: 'paga' })
+    } else {
+      patch(c, { partilhada: false, estado: estadoAuto({ ...c, partilhada: false }, Number(c.valor_pago || 0)) })
+    }
+  }
+
   async function guardarBonus(valor: number, nota: string) {
     if (!envio) return
     await supabase.from('envios').update({ bonus: valor, bonus_descricao: nota }).eq('id', envio.id)
@@ -75,11 +100,10 @@ export default function Validacao() {
     } catch (e: any) { setRevMsg('Erro: ' + e.message) }
   }
 
-  async function marcarTodas(estado: Estado) {
+  async function marcarTodasPagas() {
     for (const c of linhas) {
-      if (c.estado !== estado) {
-        const extra = estado === 'paga' && c.valor_pago == null ? { valor_pago: c.comissao_calculada } : {}
-        await updateComissao(c, { estado, ...extra }, 'diretor')
+      if (c.estado !== 'paga') {
+        await updateComissao(c, { estado: 'paga', valor_pago: devido(c) }, 'diretor')
       }
     }
     await carregar()
@@ -114,16 +138,16 @@ export default function Validacao() {
           <p className="text-sm text-gray-500">Mapa enviado por {def?.gestor_nome} para validação.</p>
         </div>
 
-        <div className="flex flex-wrap gap-3 mb-4">
-          <button onClick={() => marcarTodas('validada')} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-4 py-2">Marcar todas como validadas</button>
-          <button onClick={() => marcarTodas('paga')} className="bg-green-600 text-white text-sm font-semibold rounded-lg px-4 py-2">Marcar todas como pagas</button>
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <button onClick={marcarTodasPagas} className="bg-green-600 text-white text-sm font-semibold rounded-lg px-4 py-2">Marcar todas como pagas</button>
+          <span className="text-xs text-gray-500">Escreve o "valor pago" em cada linha — fica <b>verde/paga</b> quando ≥ comissão, ou <b>laranja/parcial</b> se for menos. Botão <b>½</b> = comissão partilhada (pagas metade).</span>
         </div>
 
         <div className="bg-white rounded-xl border">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[16%]" /><col className="w-[14%]" />
-              <col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" /><col className="w-[15%]" />
+              <col className="w-[6%]" /><col className="w-[8%]" /><col className="w-[13%]" /><col className="w-[12%]" />
+              <col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[9%]" /><col className="w-[9%]" /><col className="w-[10%]" /><col className="w-[15%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -134,13 +158,14 @@ export default function Validacao() {
                 <th className="px-2 py-2 font-medium text-right">Valor</th>
                 <th className="px-2 py-2 font-medium text-right">Comissão</th>
                 <th className="px-2 py-2 font-medium text-right">Valor pago</th>
+                <th className="px-2 py-2 font-medium text-right">Pendente</th>
                 <th className="px-2 py-2 font-medium">Estado</th>
                 <th className="px-2 py-2 font-medium">Observações</th>
               </tr>
             </thead>
             <tbody>
               {linhas.map((c) => (
-                <tr key={c.id} className={`border-b last:border-0 hover:bg-gray-50 ${c.estado === 'paga' ? 'bg-green-50' : ''}`}>
+                <tr key={c.id} className={`border-b last:border-0 hover:bg-gray-50 ${c.estado === 'paga' ? 'bg-green-50' : c.estado === 'parcial' ? 'bg-orange-50' : ''}`}>
                   <td className="px-2 py-1.5 truncate" title={c.numero_projeto}>
                     {links[c.numero_projeto]
                       ? <a href={platformUrl(links[c.numero_projeto])} target="_blank" rel="noreferrer" className="text-host-blue hover:underline">{c.numero_projeto}</a>
@@ -150,16 +175,26 @@ export default function Validacao() {
                   <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
                   <td className="px-2 py-1.5 truncate" title={`${c.produto?.tipo} (${Number(c.percentagem)}%)`}>{c.produto?.tipo} <span className="text-gray-400">{Number(c.percentagem)}%</span></td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap" title={c.is_saas && c.valor_mensal_saas ? `${eur(c.valor_mensal_saas)}/mês × 12` : ''}>{eur(c.valor_venda)}</td>
-                  <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
+                  <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">
+                    {eur(c.comissao_calculada)}
+                    <button onClick={() => togglePisco(c)}
+                      title={c.partilhada ? 'Partilhada 50% (só pagas metade) — clica para desativar' : 'Marcar como partilhada 50% (só pagas metade; a outra metade é de um colega)'}
+                      className={`ml-1 text-[10px] rounded px-1 align-middle ${c.partilhada ? 'bg-host-blue text-white' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>½</button>
+                  </td>
                   <td className="px-2 py-1.5 text-right">
-                    <input type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
-                      onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) patch(c, { valor_pago: v }) }}
+                    <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
+                      onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
                       className="w-full text-right border rounded px-1 py-1" />
+                  </td>
+                  <td className="px-2 py-1.5 text-right text-xs">
+                    {devido(c) - Number(c.valor_pago || 0) > 0.005
+                      ? <span className="text-orange-600 font-medium">{eur(devido(c) - Number(c.valor_pago || 0))}</span>
+                      : <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-2 py-1.5">
                     <select value={c.estado} onChange={(e) => patch(c, { estado: e.target.value as Estado })} className={`w-full rounded px-1 py-1 text-xs font-medium ${estadoCls[c.estado]}`}>
                       <option value="pendente">pendente</option>
-                      <option value="validada">validada</option>
+                      <option value="parcial">parcial</option>
                       <option value="paga">paga</option>
                     </select>
                   </td>

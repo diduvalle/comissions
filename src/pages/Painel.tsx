@@ -4,10 +4,10 @@ import type { Comissao, Produto, Cliente, Estado } from '../types'
 import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl } from '../utils'
 import { updateComissao, getOrCreateCliente } from '../data'
 
-const ESTADOS: Estado[] = ['pendente', 'validada', 'paga']
+const ESTADOS: Estado[] = ['pendente', 'parcial', 'paga']
 const estadoCls: Record<Estado, string> = {
   pendente: 'bg-gray-100 text-gray-700',
-  validada: 'bg-blue-100 text-host-blue',
+  parcial: 'bg-orange-100 text-orange-700',
   paga: 'bg-green-100 text-green-700',
 }
 

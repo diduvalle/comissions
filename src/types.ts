@@ -1,4 +1,4 @@
-export type Estado = 'pendente' | 'validada' | 'paga'
+export type Estado = 'pendente' | 'parcial' | 'paga'
 
 export interface Produto {
   id: string
@@ -28,6 +28,7 @@ export interface Comissao {
   valor_mensal_saas: number | null
   estado: Estado
   valor_pago: number | null
+  partilhada: boolean
   observacoes: string | null
   mes_referencia: string
   created_at?: string
