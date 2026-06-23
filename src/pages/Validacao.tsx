@@ -92,11 +92,26 @@ export default function Validacao() {
   }
 
   async function enviarRevisto() {
+    const temBonus = Number(bonus || 0) > 0
+    // 🥚 easter egg — sem bónus, o Marco leva uma "cutucada" antes de submeter
+    if (!temBonus) {
+      const ok = window.confirm(
+        '🤔 Marco… zero bónus para o Diogo este mês?\n\n' +
+        'Ele andou a fechar negócios como uma máquina e nem um cafezinho? ☕😅\n' +
+        'O Diogo MERECE e tu sabes disso.\n\n' +
+        'De certeza que queres submeter as comissões assim, sem nenhum bónus?'
+      )
+      if (!ok) return
+    }
     setRevMsg('A submeter…')
     try {
       const r = await fetch('/api/revisto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
       const out = await r.json()
-      setRevMsg(r.ok ? `✓ Revisto submetido ao Diogo (a pagar ${eur(out.aPagar)})` : `Erro: ${out.error}`)
+      if (!r.ok) { setRevMsg(`Erro: ${out.error}`); return }
+      // 🥚 easter egg — com bónus, mensagem de agradecimento calorosa
+      setRevMsg(temBonus
+        ? `🎉 Boom! O Diogo vai abrir este email e sorrir de orelha a orelha. Obrigado por seres generoso e reconheceres o desempenho de alto nível dele — ${eur(bonus)} de bónus registados! 💙`
+        : `✓ Revisto submetido ao Diogo — a pagar ${eur(out.aPagar)}. (Fica para o próximo o bónus, certo? 😉)`)
     } catch (e: any) { setRevMsg('Erro: ' + e.message) }
   }
 
@@ -146,8 +161,8 @@ export default function Validacao() {
         <div className="bg-white rounded-xl border">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[6%]" /><col className="w-[8%]" /><col className="w-[13%]" /><col className="w-[12%]" />
-              <col className="w-[8%]" /><col className="w-[10%]" /><col className="w-[9%]" /><col className="w-[9%]" /><col className="w-[10%]" /><col className="w-[15%]" />
+              <col className="w-[6%]" /><col className="w-[7%]" /><col className="w-[12%]" /><col className="w-[11%]" />
+              <col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[14%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -157,6 +172,7 @@ export default function Validacao() {
                 <th className="px-2 py-2 font-medium">Produto</th>
                 <th className="px-2 py-2 font-medium text-right">Valor</th>
                 <th className="px-2 py-2 font-medium text-right">Comissão</th>
+                <th className="px-2 py-2 font-medium text-center">Partilha</th>
                 <th className="px-2 py-2 font-medium text-right">Valor pago</th>
                 <th className="px-2 py-2 font-medium text-right">Pendente</th>
                 <th className="px-2 py-2 font-medium">Estado</th>
@@ -175,11 +191,13 @@ export default function Validacao() {
                   <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
                   <td className="px-2 py-1.5 truncate" title={`${c.produto?.tipo} (${Number(c.percentagem)}%)`}>{c.produto?.tipo} <span className="text-gray-400">{Number(c.percentagem)}%</span></td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap" title={c.is_saas && c.valor_mensal_saas ? `${eur(c.valor_mensal_saas)}/mês × 12` : ''}>{eur(c.valor_venda)}</td>
-                  <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">
-                    {eur(c.comissao_calculada)}
+                  <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
+                  <td className="px-2 py-1.5 text-center">
                     <button onClick={() => togglePisco(c)}
-                      title={c.partilhada ? 'Partilhada 50% (só pagas metade) — clica para desativar' : 'Marcar como partilhada 50% (só pagas metade; a outra metade é de um colega)'}
-                      className={`ml-1 text-[10px] rounded px-1 align-middle ${c.partilhada ? 'bg-host-blue text-white' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'}`}>½</button>
+                      title={c.partilhada ? 'Partilhada 50/50 — só pagas metade. Clica para desativar.' : 'Marcar como partilhada 50/50 (pagas só metade; a outra metade é de um colega)'}
+                      className={`text-xs font-bold rounded-md px-2 py-1 border transition-colors ${c.partilhada ? 'bg-host-blue text-white border-host-blue shadow-sm' : 'bg-white text-gray-400 border-gray-300 hover:border-host-blue hover:text-host-blue'}`}>
+                      {c.partilhada ? '50/50' : '½'}
+                    </button>
                   </td>
                   <td className="px-2 py-1.5 text-right">
                     <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
