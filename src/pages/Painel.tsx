@@ -34,11 +34,12 @@ export default function Painel() {
 
   async function carregar() {
     setLoading(true)
-    const [{ data: c }, { data: p }, { data: cl }, { data: lk }, { data: d }, { data: ev }] = await Promise.all([
-      supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').order('data_adjudicacao'),
+    const { data: c } = await supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').order('data_adjudicacao')
+    const nums = [...new Set((((c as any) || []) as any[]).map((x) => String(x.numero_projeto)))]
+    const [{ data: p }, { data: cl }, { data: lk }, { data: d }, { data: ev }] = await Promise.all([
       supabase.from('produtos').select('*').order('ordem'),
       supabase.from('clientes').select('*').order('nome'),
-      supabase.from('projeto_links').select('numero_projeto,data_id'),
+      supabase.from('projeto_links').select('numero_projeto,data_id').in('numero_projeto', nums.length ? nums : ['__none__']),
       supabase.from('definicoes').select('gestor_nome,diretor_email').eq('id', 1).single(),
       supabase.from('envios').select('mes_referencia,estado'),
     ])

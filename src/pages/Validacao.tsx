@@ -53,7 +53,8 @@ export default function Validacao() {
     ])
     setDef(d as any)
     setLinhas((c as any) || [])
-    const { data: lk } = await supabase.from('projeto_links').select('numero_projeto,data_id')
+    const nums = [...new Set((((c as any) || []) as any[]).map((x) => String(x.numero_projeto)))]
+    const { data: lk } = await supabase.from('projeto_links').select('numero_projeto,data_id').in('numero_projeto', nums.length ? nums : ['__none__'])
     setLinks(Object.fromEntries(((lk as any) || []).map((x: any) => [x.numero_projeto, x.data_id])))
     setLoading(false)
   }
