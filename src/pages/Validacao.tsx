@@ -62,7 +62,11 @@ export default function Validacao() {
         <div className="max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-4">
           <img src="https://cdn.prod.website-files.com/69b142c7dd4ed4f68e7813f9/69b142c7dd4ed4f68e781635_Host_negative_RGB.png" alt="Host" className="h-7" />
           <div className="ml-auto flex items-center gap-3">
-            <div className="h-11 w-11 rounded-full bg-host-blue flex items-center justify-center font-bold">{iniciais}</div>
+            <img
+              src="/gestora.jpg" alt={def?.gestor_nome || iniciais}
+              className="h-11 w-11 rounded-full object-cover border-2 border-white/30"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+            />
             <div className="text-right">
               <div className="font-semibold leading-tight">{def?.gestor_nome}</div>
               <div className="text-xs text-white/70">{def?.gestor_cargo}</div>
