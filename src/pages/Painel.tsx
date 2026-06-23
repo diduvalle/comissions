@@ -127,17 +127,18 @@ export default function Painel() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div className="sticky top-14 z-30 bg-[#f5f7fb] -mx-6 px-6 pt-3 pb-3 border-b border-gray-200">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <h1 className="text-2xl font-bold text-host-navy">Painel de comissões</h1>
         {!aberto && (
           <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-4 py-2 hover:opacity-90">
-            Fechar mês / Gerar link do diretor
+            Enviar
           </button>
         )}
       </div>
 
       {/* Navegação compacta */}
-      <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-3">
         <button onClick={() => setAberto((v) => !v)}
           className={`px-3 py-2 rounded-lg text-sm font-semibold border ${aberto ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-amber-700 border-amber-300 hover:bg-amber-50'}`}>
           {aberto ? '← Voltar aos meses' : '⚠ Em aberto (por pagar)'}
@@ -164,16 +165,17 @@ export default function Painel() {
       </div>
 
       {link && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm flex items-center gap-3">
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm flex items-center gap-3">
           <span className="font-medium text-host-navy">Link para o Marco:</span>
           <input readOnly value={link} className="flex-1 bg-white border rounded px-2 py-1 text-xs" onFocus={(e) => e.target.select()} />
           <button onClick={() => { navigator.clipboard.writeText(link); setCopiadoP(true); setTimeout(() => setCopiadoP(false), 2000) }} className="text-host-blue font-semibold">{copiadoP ? '✓ Copiado!' : 'Copiar'}</button>
-          <button onClick={enviarEmail} className="bg-host-blue text-white font-semibold rounded px-3 py-1.5">Enviar ao Marco</button>
+          <button onClick={enviarEmail} className="bg-host-blue text-white font-semibold rounded px-3 py-1.5">Enviar email ao Marco</button>
           {envMsg && <span className="text-xs text-gray-600">{envMsg}</span>}
         </div>
       )}
+      </div>
 
-      <div className="bg-white rounded-xl border">
+      <div className="bg-white rounded-xl border mt-4">
         <table className="w-full table-fixed text-[13px]">
           <colgroup>
             <col className="w-[8%]" /><col className="w-[8%]" /><col className="w-[16%]" /><col className="w-[15%]" />

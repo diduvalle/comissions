@@ -17,7 +17,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-white border-b">
+      <header className="bg-white border-b sticky top-0 z-40">
         <div className="max-w-[1400px] mx-auto px-6 h-14 flex items-center gap-6">
           <img src="/host-color.png" alt="Host" className="h-7" />
           <nav className="flex items-center gap-1">
