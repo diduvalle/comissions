@@ -28,6 +28,8 @@ export default function Painel() {
   const [envMsg, setEnvMsg] = useState('')
   const [editar, setEditar] = useState<Comissao | null>(null)
   const [copiadoP, setCopiadoP] = useState(false)
+  const [q, setQ] = useState('')
+  const [fEstado, setFEstado] = useState<'' | Estado>('')
   const [links, setLinks] = useState<Record<string, string>>({})
   const [def, setDef] = useState<{ gestor_nome?: string; diretor_email?: string } | null>(null)
   const [fechados, setFechados] = useState<string[]>([])
@@ -83,6 +85,15 @@ export default function Painel() {
   const totComissao = visiveis.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
   const totPago = visiveis.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
   const porPagar = visiveis.filter((c) => c.estado !== 'paga').reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
+
+  // pesquisa + filtro (só afeta as linhas mostradas; totais e envio usam o mês completo)
+  const termo = q.trim().toLowerCase()
+  const visiveisF = visiveis.filter((c) => {
+    if (fEstado && c.estado !== fEstado) return false
+    if (!termo) return true
+    return String(c.numero_projeto).toLowerCase().includes(termo) || (c.cliente?.nome || '').toLowerCase().includes(termo)
+  })
+  const aFiltrar = termo !== '' || fEstado !== ''
 
   async function patch(c: Comissao, p: Partial<Comissao>) {
     await updateComissao(c, p, 'gestor')
@@ -169,6 +180,18 @@ export default function Painel() {
             <button onClick={irSeguinte} disabled={idx <= 0} className="px-2 py-2 rounded-lg border bg-white disabled:opacity-30">▶</button>
           </div>
         )}
+        <div className="flex items-center gap-2">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="🔍 cliente ou nº…"
+            className="px-3 py-2 rounded-lg border bg-white text-sm w-44" />
+          <select value={fEstado} onChange={(e) => setFEstado(e.target.value as any)}
+            className="px-2 py-2 rounded-lg border bg-white text-sm">
+            <option value="">Todos</option>
+            <option value="pendente">pendente</option>
+            <option value="parcial">parcial</option>
+            <option value="paga">paga</option>
+          </select>
+          {aFiltrar && <button onClick={() => { setQ(''); setFEstado('') }} title="Limpar filtros" className="text-gray-400 hover:text-host-blue text-sm px-1">✕</button>}
+        </div>
         <div className="ml-auto flex items-center gap-4 text-sm">
           <span className="text-gray-500">Comissão <b className="text-host-navy">{eur(totComissao)}</b></span>
           <span className="text-gray-500">Pago <b className="text-green-700">{eur(totPago)}</b></span>
@@ -212,10 +235,10 @@ export default function Painel() {
             </tr>
           </thead>
           <tbody>
-            {visiveis.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">Sem comissões. Adiciona uma linha em baixo.</td></tr>
+            {visiveisF.length === 0 && (
+              <tr><td colSpan={9} className="px-3 py-8 text-center text-gray-400">{aFiltrar ? 'Nada encontrado com esse filtro.' : 'Sem comissões. Adiciona uma linha em baixo.'}</td></tr>
             )}
-            {visiveis.map((c) => {
+            {visiveisF.map((c) => {
               const trans = c.mes_referencia !== sel || aberto
               return (
                 <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
@@ -258,7 +281,7 @@ export default function Painel() {
           )}
         </table>
       </div>
-      <p className="text-xs text-gray-400 mt-2">{visiveis.length} linhas{!aberto && transitadas.length > 0 ? ` · ${transitadas.length} transitadas de meses anteriores` : ''}</p>
+      <p className="text-xs text-gray-400 mt-2">{aFiltrar ? `${visiveisF.length} de ${visiveis.length} linhas` : `${visiveis.length} linhas`}{!aberto && transitadas.length > 0 ? ` · ${transitadas.length} transitadas de meses anteriores` : ''}</p>
 
       {editar && <EditarLinha comissao={editar} produtos={produtos} clientes={clientes} onClose={() => setEditar(null)} onSaved={carregar} />}
     </div>
@@ -363,6 +386,12 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
     if (!nro || !cliente || !prodId) { alert('Preenche Nº, Cliente e Produto.'); return }
     setBusy(true)
     try {
+      // aviso de duplicado: mesmo nº de projeto + mesmo produto
+      const { data: dup } = await supabase.from('comissoes').select('id, mes_referencia').eq('numero_projeto', nro).eq('produto_id', prodId).limit(1)
+      if (dup && dup.length) {
+        const p = produtos.find((x) => x.id === prodId)
+        if (!confirm(`⚠️ Já existe uma comissão com o projeto ${nro} e o produto "${p?.tipo || ''}".\nQueres mesmo adicionar outra (duplicada)?`)) { setBusy(false); return }
+      }
       const cliente_id = await getOrCreateCliente(cliente)
       const { error } = await supabase.from('comissoes').insert({
         numero_projeto: nro, data_adjudicacao: data, cliente_id, produto_id: prodId,

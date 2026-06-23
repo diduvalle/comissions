@@ -300,6 +300,17 @@ export default function Validacao() {
         <div className="mt-4 grid md:grid-cols-2 gap-4">
           <div className="bg-white rounded-xl border p-4">
             <h3 className="font-semibold text-host-navy mb-3">Bónus (opcional)</h3>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <span className="text-xs text-gray-400">Rápido:</span>
+              {[50, 100].map((v) => (
+                <button key={v} onClick={() => { const nv = Math.round((Number(bonus || 0) + v) * 100) / 100; setBonus(nv); guardarBonus(nv, bonusNota) }}
+                  className="text-xs font-semibold rounded-md px-2 py-1 border border-host-blue text-host-blue hover:bg-host-blue hover:text-white transition-colors">+{v}€</button>
+              ))}
+              <button onClick={() => { const nv = Math.round(totComissao * 5) / 100; setBonus(nv); guardarBonus(nv, bonusNota) }}
+                className="text-xs font-semibold rounded-md px-2 py-1 border border-host-blue text-host-blue hover:bg-host-blue hover:text-white transition-colors">5% do total</button>
+              <button onClick={() => { setBonus(0); guardarBonus(0, bonusNota) }}
+                className="text-xs rounded-md px-2 py-1 border border-gray-300 text-gray-500 hover:bg-gray-100">limpar</button>
+            </div>
             <div className="flex items-center gap-3">
               <div>
                 <label className="text-xs text-gray-500 block">Valor do bónus</label>
