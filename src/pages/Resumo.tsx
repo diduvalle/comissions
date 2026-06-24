@@ -11,20 +11,35 @@ function pctTxt(n: number) { return `${n > 0 ? '+' : ''}${n.toFixed(0)}%` }
 export default function Resumo() {
   const [comissoes, setComissoes] = useState<Comissao[]>([])
   const [envios, setEnvios] = useState<Envio[]>([])
+  const [projetoValores, setProjetoValores] = useState<any[]>([])
+  const [metas, setMetas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [ano, setAno] = useState<number>(0)
 
-  useEffect(() => {
-    (async () => {
-      const [{ data: c }, { data: e }] = await Promise.all([
-        supabase.from('comissoes').select('*, cliente:clientes(nome), produto:produtos(tipo)'),
-        supabase.from('envios').select('*'),
-      ])
-      setComissoes((c as any) || [])
-      setEnvios((e as any) || [])
-      setLoading(false)
-    })()
-  }, [])
+  async function carregar() {
+    const [{ data: c }, { data: e }, { data: pv }] = await Promise.all([
+      supabase.from('comissoes').select('*, cliente:clientes(nome), produto:produtos(tipo)'),
+      supabase.from('envios').select('*'),
+      supabase.from('projeto_valores').select('numero_projeto,setup,saas_mes,cliente'),
+    ])
+    setComissoes((c as any) || [])
+    setEnvios((e as any) || [])
+    setProjetoValores((pv as any) || [])
+    const { data: mt } = await supabase.from('metas').select('*') // pode não existir ainda
+    setMetas((mt as any) || [])
+    setLoading(false)
+  }
+  useEffect(() => { carregar() }, [])
+
+  async function definirMeta() {
+    const atual = metas.find((m) => m.ano === ano)?.objetivo ?? ''
+    const v = window.prompt(`Meta de comissão para ${ano} (€):`, String(atual))
+    if (v == null) return
+    const n = Number(String(v).replace(/[^0-9.,]/g, '').replace(',', '.')) || 0
+    const { error } = await supabase.from('metas').upsert({ ano, objetivo: n }, { onConflict: 'ano' })
+    if (error) { alert('Primeiro cria a tabela "metas" (ver instruções).'); return }
+    setMetas((prev) => [...prev.filter((m) => m.ano !== ano), { ano, objetivo: n }])
+  }
 
   const anos = useMemo(() => {
     const s = new Set<number>()
@@ -107,7 +122,39 @@ export default function Resumo() {
   if (velho > 0) insights.push(`Atenção: ${eur(velho)} em comissões por pagar há mais de 60 dias.`)
   if (totBonus > 0) insights.push(`Bónus recebido: ${eur(totBonus)} (${((totBonus / (totComissao || 1)) * 100).toFixed(0)}% da comissão).`)
 
-  const Card = ({ label, valor, sub, cor }: { label: string; valor: string; sub?: React.ReactNode; cor?: string }) => (
+  // ===== Fase 2: meta, previsão, pipeline, sazonalidade, diretor =====
+  const now = new Date()
+  const anoAtual = now.getFullYear(); const mesAtual = now.getMonth() + 1
+  const mesesDecorridos = ano < anoAtual ? 12 : (ano === anoAtual ? mesAtual : 0)
+  const projecao = mesesDecorridos > 0 ? (totComissao / mesesDecorridos) * 12 : totComissao
+  const metaObj = Number(metas.find((m) => m.ano === ano)?.objetivo || 0)
+  const metaPct = metaObj > 0 ? Math.min(100, (totComissao / metaObj) * 100) : 0
+
+  // pipeline: projetos com valor na plataforma mas sem comissão lançada
+  const temNr = new Set(comissoes.map((c) => String(c.numero_projeto)))
+  const pipeline = projetoValores
+    .filter((p) => !temNr.has(String(p.numero_projeto)) && (Number(p.setup) > 0 || Number(p.saas_mes) > 0))
+    .map((p) => ({ ...p, est: Number(p.setup) * 0.02 + Number(p.saas_mes) * 12 * 0.03 }))
+    .sort((a, b) => b.est - a.est)
+  const pipelineTotal = pipeline.reduce((s, p) => s + p.est, 0)
+
+  // heatmap mês × ano (todos os anos)
+  const heat = [...anos].sort((a, b) => a - b).map((y) => ({
+    ano: y,
+    meses: Array.from({ length: 12 }, (_, i) => comissoes.filter((c) => { const p = parseMref(c.mes_referencia); return p.year === y && p.month === i + 1 }).reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)),
+  }))
+  const heatMax = Math.max(1, ...heat.flatMap((h) => h.meses))
+
+  // atividade do diretor (envios do ano)
+  const enviosAno = envios.filter((e) => parseMref(e.mes_referencia).year === ano)
+  const abertos = enviosAno.filter((e) => e.aberto_em)
+  const concluidos = enviosAno.filter((e) => e.estado === 'concluido')
+  const taxaAbertura = enviosAno.length ? (abertos.length / enviosAno.length) * 100 : 0
+  const tempos = abertos.map((e) => (new Date(e.aberto_em as string).getTime() - new Date(e.data_envio).getTime()) / 3600000).filter((h) => h >= 0)
+  const tempoMedioH = tempos.length ? tempos.reduce((s, h) => s + h, 0) / tempos.length : null
+  const tempoTxt = tempoMedioH == null ? '—' : tempoMedioH < 48 ? `${Math.round(tempoMedioH)}h` : `${(tempoMedioH / 24).toFixed(1)} dias`
+
+  const Card =({ label, valor, sub, cor }: { label: string; valor: string; sub?: React.ReactNode; cor?: string }) => (
     <div className="bg-white rounded-xl border p-4">
       <div className="text-xs text-gray-500">{label}</div>
       <div className={`text-2xl font-bold ${cor || 'text-host-navy'}`}>{valor}</div>
@@ -132,6 +179,33 @@ export default function Resumo() {
         <Card label="Recorrente (SaaS)" valor={eur(recorrente)} cor="text-host-blue" sub={<span className="text-gray-400">{recPct.toFixed(0)}% do total</span>} />
         <Card label="Pontual (Setup/Serviços)" valor={eur(pontual)} sub={<span className="text-gray-400">{(100 - recPct).toFixed(0)}% do total</span>} />
         <Card label="Bónus recebido" valor={eur(totBonus)} cor="text-host-blue" />
+      </div>
+
+      {/* Meta · Previsão · Pipeline */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
+        <div className="bg-white rounded-xl border p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Meta {ano}</span>
+            <button onClick={definirMeta} className="text-xs text-host-blue font-medium">{metaObj > 0 ? 'editar' : 'definir'}</button>
+          </div>
+          {metaObj > 0 ? (
+            <>
+              <div className="text-2xl font-bold text-host-navy">{metaPct.toFixed(0)}%</div>
+              <div className="text-xs text-gray-400 mb-1">{eur(totComissao)} de {eur(metaObj)}</div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full bg-host-blue" style={{ width: `${metaPct}%` }} /></div>
+            </>
+          ) : <div className="text-sm text-gray-400 mt-2">Define um objetivo para acompanhares o progresso.</div>}
+        </div>
+        <div className="bg-white rounded-xl border p-4">
+          <div className="text-xs text-gray-500">Projeção {ano} (ritmo atual)</div>
+          <div className="text-2xl font-bold text-host-navy">{eur(projecao)}</div>
+          <div className="text-xs text-gray-400">{ano === anoAtual && mesesDecorridos > 0 ? `com base em ${mesesDecorridos} ${mesesDecorridos === 1 ? 'mês' : 'meses'}` : 'ano completo'}</div>
+        </div>
+        <div className="bg-white rounded-xl border p-4" title="Projetos com valor na plataforma ainda sem comissão lançada">
+          <div className="text-xs text-gray-500">Pipeline potencial</div>
+          <div className="text-2xl font-bold text-host-blue">{eur(pipelineTotal)}</div>
+          <div className="text-xs text-gray-400">{pipeline.length} projeto(s) por lançar</div>
+        </div>
       </div>
 
       {/* Recorrente vs Pontual — barra de proporção */}
@@ -244,6 +318,39 @@ export default function Resumo() {
               ))}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Sazonalidade (heatmap mês × ano) */}
+      {heat.length > 0 && (
+        <div className="bg-white rounded-xl border p-4 mt-3">
+          <h3 className="font-semibold text-host-navy mb-3">Sazonalidade — comissão por mês × ano</h3>
+          <div className="overflow-x-auto">
+            <div className="min-w-[560px]">
+              <div className="flex text-[10px] text-gray-400 mb-1"><div className="w-10" />{MESES.map((m) => <div key={m} className="flex-1 text-center">{m.slice(0, 3)}</div>)}</div>
+              {heat.map((h) => (
+                <div key={h.ano} className="flex items-center gap-px mb-px">
+                  <div className="w-10 text-xs text-gray-500">{h.ano}</div>
+                  {h.meses.map((v, i) => (
+                    <div key={i} className="flex-1 h-6 rounded-sm" title={`${MESES[i]} ${h.ano}: ${eur(v)}`}
+                      style={{ background: v > 0 ? `rgba(27,108,168,${(0.12 + 0.88 * (v / heatMax)).toFixed(3)})` : '#f1f3f6' }} />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="text-[10px] text-gray-400 mt-1">mais escuro = mais comissão</div>
+        </div>
+      )}
+
+      {/* Atividade do diretor */}
+      <div className="bg-white rounded-xl border p-4 mt-3">
+        <h3 className="font-semibold text-host-navy mb-3">Atividade do diretor ({ano})</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div><div className="text-2xl font-bold text-host-navy">{enviosAno.length}</div><div className="text-xs text-gray-500">mapas enviados</div></div>
+          <div><div className="text-2xl font-bold text-host-navy">{taxaAbertura.toFixed(0)}%</div><div className="text-xs text-gray-500">taxa de abertura</div></div>
+          <div><div className="text-2xl font-bold text-host-navy">{tempoTxt}</div><div className="text-xs text-gray-500">tempo médio até abrir</div></div>
+          <div><div className="text-2xl font-bold text-host-navy">{concluidos.length}</div><div className="text-xs text-gray-500">concluídos (revisto)</div></div>
         </div>
       </div>
 
