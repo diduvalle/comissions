@@ -27,6 +27,7 @@ export default function Painel() {
   const [tok, setTok] = useState('')
   const [envMsg, setEnvMsg] = useState('')
   const [editar, setEditar] = useState<Comissao | null>(null)
+  const [hist, setHist] = useState<Comissao | null>(null)
   const [copiadoP, setCopiadoP] = useState(false)
   const [q, setQ] = useState('')
   const [fEstado, setFEstado] = useState<'' | Estado>('')
@@ -266,6 +267,7 @@ export default function Painel() {
                       <input defaultValue={c.observacoes ?? ''} placeholder="—" title={c.observacoes ?? ''}
                         onBlur={(e) => { if (e.target.value !== (c.observacoes ?? '')) patch(c, { observacoes: e.target.value }) }}
                         className="flex-1 min-w-0 border rounded px-1 py-1" />
+                      <button onClick={() => setHist(c)} title="Ver alterações" className="text-gray-400 hover:text-host-blue px-1 shrink-0">🕘</button>
                       <button onClick={() => setEditar(c)} title="Editar linha" className="text-gray-400 hover:text-host-blue px-1 shrink-0">✎</button>
                       <button onClick={() => deleteLinha(c)} title="Apagar linha" className="text-red-400 hover:text-red-600 px-1 shrink-0">✕</button>
                     </div>
@@ -284,6 +286,58 @@ export default function Painel() {
       <p className="text-xs text-gray-400 mt-2">{aFiltrar ? `${visiveisF.length} de ${visiveis.length} linhas` : `${visiveis.length} linhas`}{!aberto && transitadas.length > 0 ? ` · ${transitadas.length} transitadas de meses anteriores` : ''}</p>
 
       {editar && <EditarLinha comissao={editar} produtos={produtos} clientes={clientes} onClose={() => setEditar(null)} onSaved={carregar} />}
+      {hist && <HistoricoLinha comissao={hist} onClose={() => setHist(null)} />}
+    </div>
+  )
+}
+
+const CAMPO_LABEL: Record<string, string> = {
+  valor_pago: 'Valor pago', comissao_calculada: 'Comissão', percentagem: 'Percentagem',
+  estado: 'Estado', observacoes: 'Observações', valor_venda: 'Valor da venda',
+}
+
+function HistoricoLinha({ comissao, onClose }: { comissao: Comissao; onClose: () => void }) {
+  const [linhas, setLinhas] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('historico').select('*').eq('comissao_id', comissao.id).order('criado_em', { ascending: false })
+      setLinhas((data as any) || [])
+      setLoading(false)
+    })()
+  }, [comissao.id])
+
+  const fmt = (iso: string) => new Date(iso).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const val = (s: string | null) => (s == null || s === '' ? '—' : s)
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-5 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-host-navy mb-1">Histórico de alterações</h3>
+        <p className="text-sm text-gray-500 mb-4">{comissao.numero_projeto} — {comissao.cliente?.nome}</p>
+        {loading ? <p className="text-gray-400">A carregar…</p>
+          : linhas.length === 0 ? <p className="text-gray-400 text-sm">Sem alterações registadas.</p>
+          : (
+            <div className="space-y-2">
+              {linhas.map((l) => (
+                <div key={l.id} className="text-sm border-b pb-2 last:border-0">
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>{fmt(l.criado_em)}</span>
+                    <span className={`font-medium ${l.alterado_por === 'diretor' ? 'text-host-blue' : 'text-gray-500'}`}>{l.alterado_por}</span>
+                  </div>
+                  <div>
+                    <b>{CAMPO_LABEL[l.campo_alterado] || l.campo_alterado}:</b>{' '}
+                    <span className="text-gray-400 line-through">{val(l.valor_antigo)}</span>{' → '}
+                    <span className="text-host-navy font-medium">{val(l.valor_novo)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        <div className="flex justify-end mt-4">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm">Fechar</button>
+        </div>
+      </div>
     </div>
   )
 }
