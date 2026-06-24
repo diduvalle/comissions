@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Definicoes as Def, Produto } from '../types'
 
+// Atalho (bookmarklet) que recolhe os valores da plataforma e grava-os no COMISSIONS num clique.
+const BOOKMARKLET = `javascript:(async()=>{try{var S={},P=[];Ext.ComponentQuery.query('grid').forEach(function(g){var s=g.getStore&&g.getStore();if(s&&s.getCount&&s.getCount()>0&&s.getAt(0).data.hasOwnProperty('ProposalId')&&s.getAt(0).data.hasOwnProperty('Nr'))s.each(function(r){var d=r.data;if(d.ProposalId&&d.Nr&&!S[d.Nr]){S[d.Nr]=1;P.push({nr:String(d.Nr),pid:d.ProposalId,cli:d.ProfileName})}})});if(!P.length){alert('Abre Implementacao > Projetos e os separadores das marcas primeiro.');return}var B='/api/v1/SalesManagement/SalesManagement_Proposals_GetItems',O=[];for(var i=0;i<P.length;i++){var p=P[i];try{var j=await(await fetch(B+'?ConnectionName=hostassist&proposalId='+p.pid+'&page=1&start=0&limit=1000',{headers:{Accept:'application/json'},credentials:'include'})).json();var R=(j&&(j.data||j.items||j.rows))||(Array.isArray(j)?j:[]);var su=0,sa=0,sn=0;R.forEach(function(it){var n=Number(it.NetValue||0),v=Number(it.SaaSValue||0);if(v>0){sa+=v;if(it.SaaSNr)sn=it.SaaSNr}else if(n>0)su+=n});O.push({numero_projeto:p.nr,cliente:p.cli,setup:Math.round(su*100)/100,saas_mes:Math.round(sa*100)/100,meses:sn})}catch(e){}}var U='https://bhurcadussdjohbngekq.supabase.co/rest/v1/projeto_valores?on_conflict=numero_projeto',K='sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU';try{var r=await fetch(U,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(O)});if(r.ok){alert('OK! '+O.length+' valores atualizados no COMISSIONS.')}else{try{await navigator.clipboard.writeText(JSON.stringify(O))}catch(_){}alert('Envio direto bloqueado (CSP). Copiei '+O.length+' valores - cola no chat com atualiza.')}}catch(e){try{await navigator.clipboard.writeText(JSON.stringify(O))}catch(_){}alert('Envio direto bloqueado. Copiei os valores - cola no chat com atualiza.')}}catch(e){alert('Erro: '+(e.message||e))}})();`
+
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
@@ -23,6 +26,7 @@ export default function Definicoes() {
   const [msg, setMsg] = useState('')
   const [linksText, setLinksText] = useState('')
   const [linksMsg, setLinksMsg] = useState('')
+  const [bmCopiado, setBmCopiado] = useState(false)
 
   async function importarLinks() {
     const linhas = linksText.split('\n').map((l) => l.trim()).filter(Boolean)
@@ -150,6 +154,32 @@ export default function Definicoes() {
           <button onClick={importarLinks} className="bg-host-blue text-white text-sm font-semibold rounded px-4 py-2">Importar links</button>
           {linksMsg && <span className="text-sm text-gray-600">{linksMsg}</span>}
         </div>
+      </Section>
+
+      {/* Atualizar valores da plataforma */}
+      <Section title="Atualizar valores da plataforma (auto-preenchimento)">
+        <p className="text-sm text-gray-500 mb-3">
+          Os valores (Setup/SaaS) que pré-preenchem as novas linhas vêm da plataforma HostPMS. Como a plataforma exige a <b>tua sessão autenticada</b>, a atualização parte sempre de ti — mas fica a <b>1 clique</b> com o atalho abaixo.
+        </p>
+        <div className="text-sm text-host-navy font-semibold mb-1">⚙️ Configurar (só 1 vez)</div>
+        <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1 mb-3">
+          <li>No Chrome, mostra a barra de favoritos (<b>Ctrl+Shift+B</b>).</li>
+          <li>Botão direito na barra → <b>Adicionar página…</b> (novo favorito).</li>
+          <li>Nome: <b>Atualizar valores</b>. No campo <b>URL</b>, cola o código copiado abaixo.</li>
+        </ol>
+        <div className="flex items-center gap-2 mb-2">
+          <button onClick={() => { navigator.clipboard.writeText(BOOKMARKLET); setBmCopiado(true); setTimeout(() => setBmCopiado(false), 2000) }}
+            className="bg-host-blue text-white text-sm font-semibold rounded px-4 py-2">{bmCopiado ? '✓ Copiado!' : 'Copiar código do atalho'}</button>
+          <span className="text-xs text-gray-400">cola no campo URL do favorito</span>
+        </div>
+        <textarea readOnly value={BOOKMARKLET} rows={3} onFocus={(e) => e.target.select()} className="w-full border rounded px-2 py-1.5 font-mono text-[10px] text-gray-400" />
+        <div className="text-sm text-host-navy font-semibold mt-4 mb-1">🔄 Usar (1×/mês, ~30s)</div>
+        <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1">
+          <li>Entra na plataforma e abre <b>Implementação → Projetos</b>.</li>
+          <li>Clica nos separadores das marcas que vendeste (Host, CLEVER, hey!…) para carregarem.</li>
+          <li>Clica no favorito <b>Atualizar valores</b>. Aparece <i>"OK! N valores atualizados"</i> — e o auto-preenchimento já tem os projetos novos.</li>
+        </ol>
+        <p className="text-xs text-gray-400 mt-2">Se o navegador bloquear o envio direto, o atalho copia os valores para a área de transferência — basta colares no chat comigo com a palavra "atualiza".</p>
       </Section>
 
       {/* Identificação & acesso */}
