@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Envio } from '../types'
 import { eur, mrefLabel } from '../utils'
+import { IconLock, IconTrash } from '../components/icons'
 
 function fmtDataHora(iso: string) {
   const d = new Date(iso)
@@ -81,8 +82,8 @@ export default function Envios() {
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   <button onClick={() => copiar(e)} className="text-host-blue text-xs font-semibold mr-3">{copiado === e.id ? '✓ Copiado!' : 'Copiar link'}</button>
                   {e.estado === 'concluido'
-                    ? <span title="Concluído pelo diretor — guardado para histórico (não pode ser apagado)" className="text-gray-400 cursor-default">🔒</span>
-                    : <button onClick={() => apagar(e)} title="Apagar envio" className="text-red-400 hover:text-red-600">✕</button>}
+                    ? <span title="Concluído pelo diretor — guardado para histórico (não pode ser apagado)" className="inline-flex text-gray-400 cursor-default align-middle"><IconLock className="w-4 h-4" /></span>
+                    : <button onClick={() => apagar(e)} title="Apagar envio" className="inline-flex text-gray-400 hover:text-red-600 align-middle"><IconTrash className="w-4 h-4" /></button>}
                 </td>
               </tr>
             ))}

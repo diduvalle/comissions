@@ -104,8 +104,8 @@ export default function Validacao() {
     // 🥚 easter egg — sem bónus, o Marco leva uma "cutucada" antes de submeter
     if (!temBonus) {
       const ok = window.confirm(
-        '🤔 Marco… zero bónus para o Diogo este mês?\n\n' +
-        'Ele andou a fechar negócios como uma máquina e nem um cafezinho? ☕😅\n' +
+        'Marco… zero bónus para o Diogo este mês?\n\n' +
+        'Ele andou a fechar negócios como uma máquina e nem um cafezinho?\n' +
         'O Diogo MERECE e tu sabes disso.\n\n' +
         'De certeza que queres submeter as comissões assim, sem nenhum bónus?'
       )
@@ -118,8 +118,8 @@ export default function Validacao() {
       if (!r.ok) { setRevMsg(`Erro: ${out.error}`); return }
       // 🥚 easter egg — com bónus, mensagem de agradecimento calorosa
       setRevMsg(temBonus
-        ? `🎉 Boom! O Diogo vai abrir este email e sorrir de orelha a orelha. Obrigado por seres generoso e reconheceres o desempenho de alto nível dele — ${eur(bonus)} de bónus registados! 💙`
-        : `✓ Revisto submetido ao Diogo — a pagar ${eur(out.aPagar)}. (Fica para o próximo o bónus, certo? 😉)`)
+        ? `Boom! O Diogo vai abrir este email e sorrir de orelha a orelha. Obrigado por seres generoso e reconheceres o desempenho de alto nível dele — ${eur(bonus)} de bónus registados!`
+        : `Revisto submetido ao Diogo — a pagar ${eur(out.aPagar)}. (Fica para o próximo o bónus, certo?)`)
     } catch (e: any) { setRevMsg('Erro: ' + e.message) }
   }
 

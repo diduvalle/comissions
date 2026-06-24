@@ -161,7 +161,7 @@ export default function Definicoes() {
         <p className="text-sm text-gray-500 mb-3">
           Os valores (Setup/SaaS) que pré-preenchem as novas linhas vêm da plataforma HostPMS. Como a plataforma exige a <b>tua sessão autenticada</b>, a atualização parte sempre de ti — mas fica a <b>1 clique</b> com o atalho abaixo.
         </p>
-        <div className="text-sm text-host-navy font-semibold mb-1">⚙️ Configurar (só 1 vez)</div>
+        <div className="text-sm text-host-navy font-semibold mb-1">Configurar (só 1 vez)</div>
         <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1 mb-3">
           <li>No Chrome, mostra a barra de favoritos (<b>Ctrl+Shift+B</b>).</li>
           <li>Botão direito na barra → <b>Adicionar página…</b> (novo favorito).</li>
@@ -173,7 +173,7 @@ export default function Definicoes() {
           <span className="text-xs text-gray-400">cola no campo URL do favorito</span>
         </div>
         <textarea readOnly value={BOOKMARKLET} rows={3} onFocus={(e) => e.target.select()} className="w-full border rounded px-2 py-1.5 font-mono text-[10px] text-gray-400" />
-        <div className="text-sm text-host-navy font-semibold mt-4 mb-1">🔄 Usar (1×/mês, ~30s)</div>
+        <div className="text-sm text-host-navy font-semibold mt-4 mb-1">Usar (1×/mês, ~30s)</div>
         <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1">
           <li>Entra na plataforma e abre <b>Implementação → Projetos</b>.</li>
           <li>Clica nos separadores das marcas que vendeste (Host, CLEVER, hey!…) para carregarem.</li>
