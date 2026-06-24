@@ -8,7 +8,7 @@ const COR_PON = '#9aa4b2' // pontual (Setup/Serviços) — cinza
 
 function pctTxt(n: number) { return `${n > 0 ? '+' : ''}${n.toFixed(0)}%` }
 
-export default function Resumo() {
+export default function Resumo({ publico = false }: { publico?: boolean }) {
   const [comissoes, setComissoes] = useState<Comissao[]>([])
   const [envios, setEnvios] = useState<Envio[]>([])
   const [projetoValores, setProjetoValores] = useState<any[]>([])
@@ -178,7 +178,7 @@ export default function Resumo() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <h1 className="text-2xl font-bold text-host-navy">Resumo anual</h1>
+        <h1 className="text-2xl font-bold text-host-navy">Analytics</h1>
         <div className="flex items-center gap-2 no-print">
           <button onClick={() => window.print()} className="px-3 py-2 rounded-lg border bg-white text-sm font-medium text-host-navy hover:bg-gray-50">Imprimir / PDF</button>
           <select value={ano} onChange={(e) => setAno(Number(e.target.value))}
@@ -202,7 +202,7 @@ export default function Resumo() {
         <div className="bg-white rounded-xl border p-4">
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-500">Meta {ano}</span>
-            <button onClick={definirMeta} className="text-xs text-host-blue font-medium">{metaObj > 0 ? 'editar' : 'definir'}</button>
+            {!publico && <button onClick={definirMeta} className="text-xs text-host-blue font-medium">{metaObj > 0 ? 'editar' : 'definir'}</button>}
           </div>
           {metaObj > 0 ? (
             <>

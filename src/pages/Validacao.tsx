@@ -4,6 +4,7 @@ import { supabase } from '../supabase'
 import type { Comissao, Definicoes, Envio, Estado } from '../types'
 import { eur, fmtDate, mrefLabel, platformUrl, MSG_DIR } from '../utils'
 import { updateComissao } from '../data'
+import Resumo from './Resumo'
 
 const estadoCls: Record<Estado, string> = {
   pendente: 'bg-gray-100 text-gray-700',
@@ -33,6 +34,7 @@ export default function Validacao() {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
   const [revMsg, setRevMsg] = useState('')
+  const [aba, setAba] = useState<'validacao' | 'analytics'>('validacao')
   const [links, setLinks] = useState<Record<string, string>>({})
   const registado = useRef(false)
 
@@ -154,6 +156,14 @@ export default function Validacao() {
       </header>
 
       <main className="max-w-[1200px] mx-auto px-6 py-6">
+        <div className="flex gap-1 mb-5">
+          <button onClick={() => setAba('validacao')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${aba === 'validacao' ? 'bg-host-blue text-white' : 'bg-white border text-host-navy hover:bg-gray-50'}`}>Comissões</button>
+          <button onClick={() => setAba('analytics')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${aba === 'analytics' ? 'bg-host-blue text-white' : 'bg-white border text-host-navy hover:bg-gray-50'}`}>Analytics</button>
+        </div>
+
+        {aba === 'analytics' && <Resumo publico />}
+
+        {aba === 'validacao' && (<>
         <div className="mb-5">
           <h1 className="text-2xl font-bold text-host-navy">Comissões para validação — {envio && mrefLabel(envio.mes_referencia)}</h1>
           <p className="text-sm text-gray-500">Mapa enviado por {def?.gestor_nome} para validação.</p>
@@ -338,6 +348,7 @@ export default function Validacao() {
           {revMsg && <span className="text-sm text-gray-600">{revMsg}</span>}
           <span className="text-xs text-gray-400">Envia ao Diogo o ponto de situação e o total a pagar deste mês.</span>
         </div>
+        </>)}
 
         <p className="text-center text-xs text-gray-400 mt-6 italic">Move beyond expectations.</p>
       </main>
