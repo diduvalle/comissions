@@ -374,6 +374,26 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
   const [valor, setValor] = useState('')
   const [obs, setObs] = useState('')
   const [busy, setBusy] = useState(false)
+  const [platVal, setPlatVal] = useState<any>(null)
+
+  // procura os valores da plataforma para o nº de projeto (tabela projeto_valores)
+  async function buscarPlat(n: string) {
+    if (!n) { setPlatVal(null); return }
+    const { data } = await supabase.from('projeto_valores').select('*').eq('numero_projeto', n).maybeSingle()
+    setPlatVal(data || null)
+  }
+  function usarSetup() {
+    const p = produtos.find((x) => /setup/i.test(x.tipo))
+    if (p) setProdId(p.id)
+    setIsSaas(false); setValor(String(platVal.setup)); setMensal('')
+  }
+  function usarSaas() {
+    const maior = Number(platVal.meses) > 24
+    let p = produtos.find((x) => /saas/i.test(x.tipo) && (maior ? x.tipo.includes('>') : x.tipo.includes('<')))
+    if (!p) p = produtos.find((x) => /saas/i.test(x.tipo))
+    if (p) setProdId(p.id)
+    setIsSaas(true); setMensal(String(platVal.saas_mes)); setValor('')
+  }
 
   const prod = produtos.find((p) => p.id === prodId)
   useEffect(() => { if (prod) setIsSaas(/saas/i.test(prod.tipo)) }, [prodId])
@@ -400,14 +420,23 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
         estado: 'pendente', observacoes: obs || null, mes_referencia: mes || dateToMref(data),
       })
       if (error) throw error
-      setNro(''); setCliente(''); setProdId(''); setIsSaas(false); setMensal(''); setValor(''); setObs('')
+      setNro(''); setCliente(''); setProdId(''); setIsSaas(false); setMensal(''); setValor(''); setObs(''); setPlatVal(null)
       onAdd()
     } catch (e: any) { alert('Erro: ' + e.message) } finally { setBusy(false) }
   }
 
   return (
     <tr className="border-t-2 border-host-blue/30 bg-blue-50/40">
-      <td className="px-2 py-1.5"><input value={nro} onChange={(e) => setNro(e.target.value)} placeholder="Nº" className="w-full border rounded px-1 py-1" /></td>
+      <td className="px-2 py-1.5 align-top">
+        <input value={nro} onChange={(e) => setNro(e.target.value)} onBlur={(e) => buscarPlat(e.target.value.trim())} placeholder="Nº" className="w-full border rounded px-1 py-1" />
+        {platVal && (Number(platVal.setup) > 0 || Number(platVal.saas_mes) > 0) && (
+          <div className="mt-1 text-[10px] leading-tight text-host-blue">
+            📥 plataforma:
+            {Number(platVal.setup) > 0 && <button type="button" onClick={usarSetup} className="block underline hover:no-underline">Setup {eur(platVal.setup)}</button>}
+            {Number(platVal.saas_mes) > 0 && <button type="button" onClick={usarSaas} className="block underline hover:no-underline">SaaS {eur(platVal.saas_mes)}/mês</button>}
+          </div>
+        )}
+      </td>
       <td className="px-2 py-1.5"><input type="date" value={data} onChange={(e) => setData(e.target.value)} className="w-full border rounded px-1 py-1" /></td>
       <td className="px-2 py-1.5">
         <input list="clientes-list" value={cliente} onChange={(e) => setCliente(e.target.value)} placeholder="Cliente" className="w-full border rounded px-1 py-1" />
