@@ -149,7 +149,7 @@ export default function Painel() {
 
   return (
     <div>
-      <div className="sticky top-14 z-30 bg-[#f5f7fb] -mx-6 px-6 pt-3 pb-3 border-b border-gray-200">
+      <div className="sticky top-16 z-30 bg-[#f5f7fb] -mx-6 px-6 pt-3 pb-3 border-b border-gray-200">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold text-host-navy">Painel de comissões</h1>
@@ -220,8 +220,8 @@ export default function Painel() {
       )}
       </div>
 
-      <div className="bg-white rounded-xl border mt-4">
-        <table className="w-full table-fixed text-[13px]">
+      <div className="bg-white rounded-xl border mt-4 overflow-x-auto">
+        <table className="w-full min-w-[820px] table-fixed text-[13px]">
           <colgroup>
             <col className="w-[8%]" /><col className="w-[8%]" /><col className="w-[16%]" /><col className="w-[15%]" />
             <col className="w-[10%]" /><col className="w-[10%]" /><col className="w-[9%]" /><col className="w-[9%]" /><col className="w-[15%]" />

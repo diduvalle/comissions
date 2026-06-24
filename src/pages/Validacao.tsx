@@ -216,8 +216,8 @@ export default function Validacao() {
                   <label className="text-xs text-gray-500">Pago</label>
                   <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—" inputMode="decimal"
                     onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
-                    className="flex-1 text-right border rounded px-2 py-1.5" />
-                  <button onClick={() => pagarComissao(c)} title="Pagar a comissão toda" className="bg-green-600 text-white text-sm font-semibold rounded px-3 py-1.5">✓ Pagar</button>
+                    className="flex-1 min-w-0 text-right border rounded px-2 py-1.5" />
+                  <button onClick={() => pagarComissao(c)} title="Pagar a comissão toda" className="shrink-0 bg-green-600 text-white text-sm font-semibold rounded px-3 py-1.5">✓ Pagar</button>
                 </div>
                 {pend > 0.005 && <div className="text-xs text-orange-600 mb-2">Pendente: {eur(pend)}</div>}
                 {c.observacoes && <div className="text-[11px] text-gray-600 whitespace-pre-wrap mb-1">{c.observacoes}</div>}

@@ -18,9 +18,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-white/80 backdrop-blur-md border-b border-host-navy/10 sticky top-0 z-40">
-        <div className="max-w-[1400px] mx-auto px-6 h-16 flex items-center gap-6">
-          <img src="/host-color.png" alt="Host" className="h-7" />
-          <nav className="flex items-center gap-1">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center gap-3 sm:gap-6 overflow-x-auto">
+          <img src="/host-color.png" alt="Host" className="h-7 shrink-0" />
+          <nav className="flex items-center gap-1 shrink-0">
             {tab('/', 'Painel')}
             {tab('/resumo', 'Analytics')}
             {tab('/envios', 'Envios')}
