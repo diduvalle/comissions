@@ -3,8 +3,8 @@ import { supabase } from '../supabase'
 import type { Comissao, Envio } from '../types'
 import { eur, parseMref, MESES } from '../utils'
 
-const COR_REC = '#1B6CA8' // recorrente (SaaS) — host-blue
-const COR_PON = '#9aa4b2' // pontual (Setup/Serviços) — cinza
+const COR_REC = '#0667FF' // recorrente (SaaS) — azul Host
+const COR_PON = '#cbd5e1' // pontual (Setup/Serviços) — cinza claro
 
 function pctTxt(n: number) { return `${n > 0 ? '+' : ''}${n.toFixed(0)}%` }
 
@@ -167,11 +167,11 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
   const marcas = Object.entries(porMarca).map(([marca, v]) => ({ marca, v })).sort((a, b) => b.v - a.v)
   const maxMarca = Math.max(1, ...marcas.map((m) => m.v))
 
-  const Card =({ label, valor, sub, cor }: { label: string; valor: string; sub?: React.ReactNode; cor?: string }) => (
-    <div className="bg-white rounded-xl border p-4">
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className={`text-2xl font-bold ${cor || 'text-host-navy'}`}>{valor}</div>
-      {sub && <div className="text-xs mt-0.5">{sub}</div>}
+  const Card = ({ label, valor, sub, cor }: { label: string; valor: string; sub?: React.ReactNode; cor?: string }) => (
+    <div className="bg-white rounded-xl border p-5">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-gray-400">{label}</div>
+      <div className={`text-[27px] font-bold leading-tight mt-0.5 ${cor || 'text-host-navy'}`}>{valor}</div>
+      {sub && <div className="text-xs mt-1">{sub}</div>}
     </div>
   )
 
@@ -242,10 +242,11 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
 
       {/* Insights automáticos */}
       {insights.length > 0 && (
-        <div className="bg-host-navy text-white rounded-xl p-4 mb-3">
-          <h3 className="font-semibold mb-2">Destaques</h3>
-          <ul className="space-y-1 text-sm text-white/90">
-            {insights.map((t, i) => <li key={i} className="flex gap-2"><span className="text-white/40">•</span><span>{t}</span></li>)}
+        <div className="relative overflow-hidden bg-gradient-to-br from-host-ink via-host-navy to-[#1c3047] text-white rounded-xl p-5 mb-3 shadow-elevated">
+          <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full bg-host-blue/20 blur-3xl pointer-events-none" />
+          <h3 className="relative font-semibold mb-2">Destaques</h3>
+          <ul className="relative space-y-1.5 text-sm text-white/90">
+            {insights.map((t, i) => <li key={i} className="flex gap-2"><span className="text-host-blue">▸</span><span>{t}</span></li>)}
           </ul>
         </div>
       )}
@@ -371,7 +372,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
                   <div className="w-10 text-xs text-gray-500">{h.ano}</div>
                   {h.meses.map((v, i) => (
                     <div key={i} className="flex-1 h-6 rounded-sm" title={`${MESES[i]} ${h.ano}: ${eur(v)}`}
-                      style={{ background: v > 0 ? `rgba(27,108,168,${(0.12 + 0.88 * (v / heatMax)).toFixed(3)})` : '#f1f3f6' }} />
+                      style={{ background: v > 0 ? `rgba(6,103,255,${(0.12 + 0.88 * (v / heatMax)).toFixed(3)})` : '#eef1f6' }} />
                   ))}
                 </div>
               ))}

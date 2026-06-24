@@ -156,7 +156,7 @@ export default function Painel() {
           {!aberto && selFechado && <span title="O diretor já reviu e concluiu este mês" className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 px-2 py-1"><IconLock className="w-3 h-3" /> concluído pelo diretor</span>}
         </div>
         {!aberto && (
-          <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-4 py-2 hover:opacity-90">
+          <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-5 py-2 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
             {selFechado ? 'Reenviar' : 'Enviar'}
           </button>
         )}

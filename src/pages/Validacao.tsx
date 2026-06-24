@@ -140,12 +140,13 @@ export default function Validacao() {
   const progresso = linhas.length ? Math.round((tratadas / linhas.length) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-host-navy/5">
-      <header className="bg-host-navy text-white">
-        <div className="max-w-[1200px] mx-auto px-6 py-5 flex items-center gap-4">
+    <div className="min-h-screen">
+      <header className="relative overflow-hidden bg-gradient-to-br from-host-ink via-host-navy to-[#1c3047] text-white shadow-elevated">
+        <div className="absolute -top-24 -right-16 w-80 h-80 rounded-full bg-host-blue/20 blur-3xl pointer-events-none" />
+        <div className="relative max-w-[1200px] mx-auto px-6 py-6 flex items-center gap-4">
           <img src="/host-white.png" alt="Host" className="h-7" />
           <div className="ml-auto flex items-center gap-3">
-            <img src="/gestora.jpg" alt={def?.gestor_nome || 'gestora'} className="h-11 w-11 rounded-full object-cover border-2 border-white/30"
+            <img src="/gestora.jpg" alt={def?.gestor_nome || 'gestora'} className="h-12 w-12 rounded-full object-cover ring-2 ring-white/40 shadow-lg"
               onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
             <div className="text-right">
               <div className="font-semibold leading-tight">{def?.gestor_nome}</div>
@@ -155,7 +156,7 @@ export default function Validacao() {
         </div>
       </header>
 
-      <main className="max-w-[1200px] mx-auto px-6 py-6">
+      <main className="max-w-[1200px] mx-auto px-6 py-6 animate-fade-up">
         <div className="flex gap-1 mb-5">
           <button onClick={() => setAba('validacao')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${aba === 'validacao' ? 'bg-host-blue text-white' : 'bg-white border text-host-navy hover:bg-gray-50'}`}>Comissões</button>
           <button onClick={() => setAba('analytics')} className={`px-4 py-2 rounded-lg text-sm font-semibold ${aba === 'analytics' ? 'bg-host-blue text-white' : 'bg-white border text-host-navy hover:bg-gray-50'}`}>Analytics</button>
@@ -331,7 +332,8 @@ export default function Validacao() {
               </div>
             </div>
           </div>
-          <div className="bg-host-navy text-white rounded-xl p-4 flex flex-col justify-center">
+          <div className="relative overflow-hidden bg-gradient-to-br from-host-ink via-host-navy to-[#1c3047] text-white rounded-xl p-5 flex flex-col justify-center shadow-elevated">
+            <div className="absolute -top-12 -right-8 w-44 h-44 rounded-full bg-host-blue/20 blur-3xl pointer-events-none" />
             <div className="flex justify-between text-sm text-white/70"><span>Total comissões ({linhas.length})</span><span>{eur(totComissao)}</span></div>
             <div className="flex justify-between text-sm text-white/70"><span>Marcado para pagar</span><span>{eur(totPago)}</span></div>
             <div className="flex justify-between text-sm text-white/70"><span>Bónus</span><span>{eur(bonus)}</span></div>
@@ -342,7 +344,7 @@ export default function Validacao() {
         </div>
 
         <div className="mt-6 flex flex-col items-center gap-2">
-          <button onClick={enviarRevisto} className="bg-green-600 text-white font-semibold rounded-lg px-6 py-3 hover:opacity-90">
+          <button onClick={enviarRevisto} className="bg-gradient-to-r from-green-600 to-emerald-500 text-white font-semibold rounded-xl px-7 py-3.5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
             ✓ Revisto — submeter ao Diogo
           </button>
           {revMsg && <span className="text-sm text-gray-600">{revMsg}</span>}

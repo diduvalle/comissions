@@ -45,21 +45,24 @@ export default function PinGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-host-navy px-4">
-      <form onSubmit={tentar} className="w-full max-w-sm bg-white rounded-2xl shadow-xl p-8 text-center">
+    <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden bg-gradient-to-br from-host-ink via-host-navy to-[#1c3047]">
+      <div className="absolute -top-32 -right-24 w-[28rem] h-[28rem] rounded-full bg-host-blue/25 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-32 -left-24 w-[26rem] h-[26rem] rounded-full bg-host-blue/10 blur-3xl pointer-events-none" />
+      <form onSubmit={tentar} className="relative w-full max-w-sm bg-white/95 backdrop-blur rounded-2xl shadow-elevated p-8 text-center animate-fade-up">
         <img src="/host-color.png" alt="Host" className="h-9 mx-auto mb-6" />
-        <h1 className="text-xl font-bold text-host-navy">Comissões</h1>
+        <h1 className="text-2xl font-bold text-host-navy">Comissões</h1>
         <p className="text-sm text-gray-500 mb-6">Introduz o PIN para entrar.</p>
         <input
           autoFocus inputMode="numeric" type="password" value={pin}
           onChange={(e) => setPin(e.target.value)}
-          className="w-full text-center text-2xl tracking-[0.5em] border rounded-lg py-3 mb-3 outline-none focus:border-host-blue"
+          className="w-full text-center text-2xl tracking-[0.5em] border rounded-xl py-3 mb-3"
           placeholder="••••••"
         />
         {erro && <p className="text-sm text-red-600 mb-3">{erro}</p>}
-        <button type="submit" className="w-full bg-host-blue text-white font-semibold rounded-lg py-3 hover:opacity-90">
+        <button type="submit" className="w-full bg-host-blue text-white font-semibold rounded-xl py-3 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
           Entrar
         </button>
+        <p className="text-[11px] text-gray-300 mt-6 italic">Host Hotel Systems · Move beyond expectations.</p>
       </form>
     </div>
   )

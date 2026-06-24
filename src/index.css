@@ -7,14 +7,49 @@ html, body, #root {
 }
 body {
   margin: 0;
-  background: #f5f7fb;
+  background:
+    radial-gradient(1100px 560px at 85% -12%, #e7efff 0%, rgba(231,239,255,0) 55%),
+    linear-gradient(180deg, #f6f8fc 0%, #eef2f8 100%);
+  background-attachment: fixed;
   color: #182633;
   font-family: 'Poppins', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
+
+h1, h2, h3 { letter-spacing: -0.015em; }
+::selection { background: rgba(6, 103, 255, 0.18); }
+
+/* Cartões — elevação suave coerente + leve realce no hover */
+.rounded-xl.border {
+  border-color: rgba(24, 38, 51, 0.08);
+  box-shadow: 0 1px 2px rgba(24, 38, 51, 0.04), 0 1px 3px rgba(24, 38, 51, 0.05);
+  transition: box-shadow .22s ease, border-color .22s ease;
+}
+.rounded-xl.border:hover {
+  box-shadow: 0 14px 34px -16px rgba(24, 38, 51, 0.20);
+  border-color: rgba(24, 38, 51, 0.12);
+}
+
+/* Botões e campos — transições e foco azul da marca */
+button { transition: all .18s ease; }
+input, select, textarea { transition: border-color .15s ease, box-shadow .15s ease; }
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #0667FF;
+  box-shadow: 0 0 0 3px rgba(6, 103, 255, 0.15);
+}
+
+/* Scrollbar discreta */
+* { scrollbar-width: thin; scrollbar-color: rgba(24,38,51,.2) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: rgba(24,38,51,.18); border-radius: 9px; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(24,38,51,.32); background-clip: content-box; }
 
 @media print {
   header, footer, .no-print { display: none !important; }
   body { background: #fff; }
   main { padding: 0 !important; max-width: 100% !important; }
-  .border { border-color: #e5e7eb !important; }
+  .rounded-xl.border { box-shadow: none !important; border-color: #e5e7eb !important; }
 }
