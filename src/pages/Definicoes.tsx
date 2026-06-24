@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Definicoes as Def, Produto } from '../types'
+import { MSG_DIR } from '../utils'
 
 // Atalho (bookmarklet) que recolhe os valores da plataforma e grava-os no COMISSIONS num clique.
 const BOOKMARKLET = `javascript:(async()=>{try{var S={},P=[];Ext.ComponentQuery.query('grid').forEach(function(g){var s=g.getStore&&g.getStore();if(s&&s.getCount&&s.getCount()>0&&s.getAt(0).data.hasOwnProperty('ProposalId')&&s.getAt(0).data.hasOwnProperty('Nr'))s.each(function(r){var d=r.data;if(d.ProposalId&&d.Nr&&!S[d.Nr]){S[d.Nr]=1;P.push({nr:String(d.Nr),pid:d.ProposalId,cli:d.ProfileName})}})});if(!P.length){alert('Abre Implementacao > Projetos e os separadores das marcas primeiro.');return}var B='/api/v1/SalesManagement/SalesManagement_Proposals_GetItems',O=[];for(var i=0;i<P.length;i++){var p=P[i];try{var j=await(await fetch(B+'?ConnectionName=hostassist&proposalId='+p.pid+'&page=1&start=0&limit=1000',{headers:{Accept:'application/json'},credentials:'include'})).json();var R=(j&&(j.data||j.items||j.rows))||(Array.isArray(j)?j:[]);var su=0,sa=0,sn=0;R.forEach(function(it){var n=Number(it.NetValue||0),v=Number(it.SaaSValue||0);if(v>0){sa+=v;if(it.SaaSNr)sn=it.SaaSNr}else if(n>0)su+=n});O.push({numero_projeto:p.nr,cliente:p.cli,setup:Math.round(su*100)/100,saas_mes:Math.round(sa*100)/100,meses:sn})}catch(e){}}var U='https://bhurcadussdjohbngekq.supabase.co/rest/v1/projeto_valores?on_conflict=numero_projeto',K='sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU';try{var r=await fetch(U,{method:'POST',headers:{apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(O)});if(r.ok){alert('OK! '+O.length+' valores atualizados no COMISSIONS.')}else{try{await navigator.clipboard.writeText(JSON.stringify(O))}catch(_){}alert('Envio direto bloqueado (CSP). Copiei '+O.length+' valores - cola no chat com atualiza.')}}catch(e){try{await navigator.clipboard.writeText(JSON.stringify(O))}catch(_){}alert('Envio direto bloqueado. Copiei os valores - cola no chat com atualiza.')}}catch(e){alert('Erro: '+(e.message||e))}})();`
@@ -139,6 +140,31 @@ export default function Definicoes() {
             </div>
           </div>
         </div>
+      </Section>
+
+      {/* Mensagens automáticas ao diretor */}
+      <Section title="Mensagens automáticas ao diretor">
+        <p className="text-sm text-gray-500 mb-4">
+          Textos que o Marco vê na <b>página de validação</b>, por momento. Marcadores: <code className="text-xs">{'{bonus}'}</code> (valor do bónus) · <code className="text-xs">{'{aPagar}'}</code> (total a pagar). Deixa em branco para usar o texto-base.
+        </p>
+        <div className="space-y-4 text-sm">
+          <label className="block">
+            <span className="font-medium text-host-navy">1. Antes de submeter — se NÃO houver bónus</span>
+            <span className="block text-xs text-gray-400 mb-1">Aviso (pop-up) que aparece ao clicar "Revisto" sem ter posto bónus. Tem de confirmar para enviar.</span>
+            <textarea value={def.msg_dir_confirma ?? MSG_DIR.confirma} onChange={(e) => set('msg_dir_confirma', e.target.value)} rows={4} className="w-full border rounded px-2 py-1.5" />
+          </label>
+          <label className="block">
+            <span className="font-medium text-host-navy">2. Depois de submeter — COM bónus</span>
+            <span className="block text-xs text-gray-400 mb-1">Mensagem de agradecimento que aparece após enviar, quando há bónus.</span>
+            <textarea value={def.msg_dir_bonus ?? MSG_DIR.bonus} onChange={(e) => set('msg_dir_bonus', e.target.value)} rows={3} className="w-full border rounded px-2 py-1.5" />
+          </label>
+          <label className="block">
+            <span className="font-medium text-host-navy">3. Depois de submeter — SEM bónus</span>
+            <span className="block text-xs text-gray-400 mb-1">Mensagem que aparece após enviar, quando não há bónus.</span>
+            <textarea value={def.msg_dir_sem_bonus ?? MSG_DIR.semBonus} onChange={(e) => set('msg_dir_sem_bonus', e.target.value)} rows={2} className="w-full border rounded px-2 py-1.5" />
+          </label>
+        </div>
+        <p className="text-xs text-gray-400 mt-3">Carrega em <b>Guardar</b> (no topo) para aplicar.</p>
       </Section>
 
       {/* Links da plataforma */}

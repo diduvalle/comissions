@@ -52,6 +52,9 @@ export interface Definicoes {
   email_botao_label: string
   email_botao_posicao: 'antes' | 'depois'
   pin: string
+  msg_dir_confirma: string | null
+  msg_dir_bonus: string | null
+  msg_dir_sem_bonus: string | null
 }
 
 export interface Historico {

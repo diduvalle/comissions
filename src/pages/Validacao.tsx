@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import type { Comissao, Definicoes, Envio, Estado } from '../types'
-import { eur, fmtDate, mrefLabel, platformUrl } from '../utils'
+import { eur, fmtDate, mrefLabel, platformUrl, MSG_DIR } from '../utils'
 import { updateComissao } from '../data'
 
 const estadoCls: Record<Estado, string> = {
@@ -101,14 +101,9 @@ export default function Validacao() {
 
   async function enviarRevisto() {
     const temBonus = Number(bonus || 0) > 0
-    // 🥚 easter egg — sem bónus, o Marco leva uma "cutucada" antes de submeter
+    // sem bónus, o Marco leva uma "cutucada" antes de submeter (texto editável nas Definições)
     if (!temBonus) {
-      const ok = window.confirm(
-        'Marco… zero bónus para o Diogo este mês?\n\n' +
-        'Ele andou a fechar negócios como uma máquina e nem um cafezinho?\n' +
-        'O Diogo MERECE e tu sabes disso.\n\n' +
-        'De certeza que queres submeter as comissões assim, sem nenhum bónus?'
-      )
+      const ok = window.confirm(def?.msg_dir_confirma || MSG_DIR.confirma)
       if (!ok) return
     }
     setRevMsg('A submeter…')
@@ -116,10 +111,10 @@ export default function Validacao() {
       const r = await fetch('/api/revisto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
       const out = await r.json()
       if (!r.ok) { setRevMsg(`Erro: ${out.error}`); return }
-      // 🥚 easter egg — com bónus, mensagem de agradecimento calorosa
+      // mensagem final (editável nas Definições) — com/sem bónus
       setRevMsg(temBonus
-        ? `Boom! O Diogo vai abrir este email e sorrir de orelha a orelha. Obrigado por seres generoso e reconheceres o desempenho de alto nível dele — ${eur(bonus)} de bónus registados!`
-        : `Revisto submetido ao Diogo — a pagar ${eur(out.aPagar)}. (Fica para o próximo o bónus, certo?)`)
+        ? (def?.msg_dir_bonus || MSG_DIR.bonus).replace('{bonus}', eur(bonus))
+        : (def?.msg_dir_sem_bonus || MSG_DIR.semBonus).replace('{aPagar}', eur(out.aPagar)))
     } catch (e: any) { setRevMsg('Erro: ' + e.message) }
   }
 
