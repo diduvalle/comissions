@@ -11,3 +11,10 @@ body {
   color: #182633;
   font-family: 'Poppins', system-ui, sans-serif;
 }
+
+@media print {
+  header, footer, .no-print { display: none !important; }
+  body { background: #fff; }
+  main { padding: 0 !important; max-width: 100% !important; }
+  .border { border-color: #e5e7eb !important; }
+}

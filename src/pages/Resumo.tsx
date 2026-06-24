@@ -20,7 +20,7 @@ export default function Resumo() {
     const [{ data: c }, { data: e }, { data: pv }] = await Promise.all([
       supabase.from('comissoes').select('*, cliente:clientes(nome), produto:produtos(tipo)'),
       supabase.from('envios').select('*'),
-      supabase.from('projeto_valores').select('numero_projeto,setup,saas_mes,cliente'),
+      supabase.from('projeto_valores').select('numero_projeto,setup,saas_mes,cliente,marca'),
     ])
     setComissoes((c as any) || [])
     setEnvios((e as any) || [])
@@ -154,6 +154,19 @@ export default function Resumo() {
   const tempoMedioH = tempos.length ? tempos.reduce((s, h) => s + h, 0) / tempos.length : null
   const tempoTxt = tempoMedioH == null ? '—' : tempoMedioH < 48 ? `${Math.round(tempoMedioH)}h` : `${(tempoMedioH / 24).toFixed(1)} dias`
 
+  // média móvel de 3 meses (linha de tendência)
+  const ma = porMes.map((_, i) => { const w = porMes.slice(Math.max(0, i - 2), i + 1); return w.reduce((s, x) => s + x, 0) / w.length })
+  const maPts = ma.map((v, i) => `${((i + 0.5) / 12 * 100).toFixed(2)},${(100 - (v / maxMes) * 100).toFixed(2)}`).join(' ')
+
+  // por marca (junta comissões → projeto_valores.marca pelo nº de projeto)
+  const marcaDe: Record<string, string> = {}
+  projetoValores.forEach((p) => { if (p.marca) marcaDe[String(p.numero_projeto)] = p.marca })
+  const porMarca: Record<string, number> = {}
+  let comMarca = 0
+  doAno.forEach((c) => { const m = marcaDe[String(c.numero_projeto)]; if (m) { porMarca[m] = (porMarca[m] || 0) + Number(c.comissao_calculada || 0); comMarca += Number(c.comissao_calculada || 0) } })
+  const marcas = Object.entries(porMarca).map(([marca, v]) => ({ marca, v })).sort((a, b) => b.v - a.v)
+  const maxMarca = Math.max(1, ...marcas.map((m) => m.v))
+
   const Card =({ label, valor, sub, cor }: { label: string; valor: string; sub?: React.ReactNode; cor?: string }) => (
     <div className="bg-white rounded-xl border p-4">
       <div className="text-xs text-gray-500">{label}</div>
@@ -166,10 +179,13 @@ export default function Resumo() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <h1 className="text-2xl font-bold text-host-navy">Resumo anual</h1>
-        <select value={ano} onChange={(e) => setAno(Number(e.target.value))}
-          className="px-3 py-2 rounded-lg border bg-white text-sm font-semibold text-host-navy">
-          {anos.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        <div className="flex items-center gap-2 no-print">
+          <button onClick={() => window.print()} className="px-3 py-2 rounded-lg border bg-white text-sm font-medium text-host-navy hover:bg-gray-50">Imprimir / PDF</button>
+          <select value={ano} onChange={(e) => setAno(Number(e.target.value))}
+            className="px-3 py-2 rounded-lg border bg-white text-sm font-semibold text-host-navy">
+            {anos.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* KPIs */}
@@ -241,19 +257,23 @@ export default function Resumo() {
           <div className="flex items-center gap-3 text-xs text-gray-500">
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm inline-block" style={{ background: COR_REC }} /> {ano}</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-gray-300 inline-block" /> {ano - 1}</span>
+            <span className="flex items-center gap-1"><span className="w-3 inline-block border-t-2 border-host-navy/50" /> tendência</span>
           </div>
         </div>
-        <div className="flex items-end gap-1 h-44">
-          {porMes.map((v, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-0.5" title={`${MESES[i]}: ${eur(v)} (${ano - 1}: ${eur(porMesAnt[i])})`}>
-              <div className="w-full flex items-end justify-center gap-px h-full">
+        <div className="relative h-40">
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <polyline points={maPts} fill="none" stroke="#0F1E2E" strokeWidth="0.7" opacity="0.45" vectorEffect="non-scaling-stroke" />
+          </svg>
+          <div className="flex items-end gap-1 h-full">
+            {porMes.map((v, i) => (
+              <div key={i} className="flex-1 flex items-end justify-center gap-px h-full" title={`${MESES[i]}: ${eur(v)} · ${ano - 1}: ${eur(porMesAnt[i])} · média 3m: ${eur(ma[i])}`}>
                 <div className="w-1/2 rounded-t bg-gray-300" style={{ height: `${(porMesAnt[i] / maxMes) * 100}%` }} />
                 <div className="w-1/2 rounded-t" style={{ height: `${(v / maxMes) * 100}%`, background: COR_REC }} />
               </div>
-              <span className="text-[10px] text-gray-400">{MESES[i].slice(0, 3)}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
+        <div className="flex gap-1 mt-1">{MESES.map((m) => <div key={m} className="flex-1 text-center text-[10px] text-gray-400">{m.slice(0, 3)}</div>)}</div>
         <div className="mt-2 text-xs text-gray-500">Acumulado {ano}: <b className="text-host-navy">{eur(acumulado[11])}</b></div>
       </div>
 
@@ -290,6 +310,24 @@ export default function Resumo() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Por marca */}
+      <div className="bg-white rounded-xl border p-4 mb-3">
+        <h3 className="font-semibold text-host-navy mb-3">Comissão por marca</h3>
+        {marcas.length === 0 ? (
+          <p className="text-sm text-gray-400">Sem marca atribuída aos projetos ainda — é preenchida pela recolha de valores da plataforma.</p>
+        ) : (
+          <div className="space-y-2">
+            {marcas.map((m) => (
+              <div key={m.marca}>
+                <div className="flex justify-between text-xs mb-0.5"><span className="text-gray-600">{m.marca}</span><b className="text-host-navy whitespace-nowrap ml-2">{eur(m.v)}</b></div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${(m.v / maxMarca) * 100}%`, background: COR_REC }} /></div>
+              </div>
+            ))}
+            {comMarca < totComissao && <p className="text-[10px] text-gray-400 mt-1">{eur(totComissao - comMarca)} ainda sem marca atribuída.</p>}
+          </div>
+        )}
       </div>
 
       {/* Pagamentos + aging */}
