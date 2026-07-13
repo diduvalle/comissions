@@ -83,4 +83,5 @@ export interface Envio {
   enviado_para: string | null
   aberto_em: string | null
   aberto_contagem: number
+  cc_aberto_em: string | null
 }

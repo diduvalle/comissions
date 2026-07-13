@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import type { Comissao, Definicoes, Envio, Estado } from '../types'
@@ -20,12 +20,19 @@ export default function VerEnvio() {
   const [links, setLinks] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
+  const registado = useRef(false)
 
   useEffect(() => {
     (async () => {
       const { data: e } = await supabase.from('envios').select('*').eq('token', token).maybeSingle()
       if (!e) { setErro('Link inválido ou expirado.'); setLoading(false); return }
       setEnvio(e as any)
+      // avisa o gestor quando a contabilidade abre (1ª vez), distinto do diretor
+      if (!registado.current && !(e as any).cc_aberto_em) {
+        registado.current = true
+        supabase.from('envios').update({ cc_aberto_em: new Date().toISOString() }).eq('id', (e as any).id)
+        fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'cc' }) }).catch(() => {})
+      }
       const [{ data: d }, { data: c }] = await Promise.all([
         supabase.from('definicoes').select('*').eq('id', 1).single(),
         supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').in('id', (e as any).comissao_ids),

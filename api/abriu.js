@@ -1,4 +1,6 @@
-// Avisa o gestor (Diogo) por email quando o diretor ABRE o mapa pela 1ª vez.
+// Avisa o gestor (Diogo) quando ALGUÉM abre o mapa pela 1ª vez.
+// who='diretor' → abriu a página de validação (link editável).
+// who='cc'      → contabilidade abriu a vista só-leitura (/ver).
 const SB = 'https://bhurcadussdjohbngekq.supabase.co'
 const SB_KEY = 'sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU'
 const GESTOR_EMAIL = 'diogo.vale@hostpms.com'
@@ -12,23 +14,35 @@ export default async function handler(req, res) {
   if (!RESEND) return res.status(200).json({ ok: false, skip: 'sem RESEND' })
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
   const token = body.token
+  const who = body.who === 'cc' ? 'cc' : 'diretor'
   if (!token) return res.status(400).json({ error: 'token em falta' })
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
   try {
     const envio = (await (await fetch(`${SB}/rest/v1/envios?token=eq.${token}&select=mes_referencia`, { headers: h })).json())[0]
     if (!envio) return res.status(404).json({ error: 'Envio não encontrado' })
+    const def = (await (await fetch(`${SB}/rest/v1/definicoes?id=eq.1&select=diretor_nome,cc_email`, { headers: h })).json())[0] || {}
+    const mes = mrefLabel(envio.mes_referencia)
+
+    let subject, corpo
+    if (who === 'cc') {
+      subject = `📄 Contabilidade abriu o mapa (só leitura) — ${mes}`
+      corpo = `A <b>contabilidade</b>${def.cc_email ? ` (${def.cc_email})` : ''} acabou de <b>abrir</b> a vista <b>só de leitura</b> do mapa de <b>${mes}</b>.`
+    } else {
+      subject = `👀 ${def.diretor_nome || 'O diretor'} abriu o mapa (validação) — ${mes}`
+      corpo = `O teu <b>diretor</b>, <b>${def.diretor_nome || ''}</b>, acabou de <b>abrir</b> o mapa de <b>validação</b> de <b>${mes}</b>. Está a rever os valores — quando concluir, recebes o mapa revisto.`
+    }
+
     const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0F1E2E;font-size:14px">
-      <p>👀 Boa notícia — o <b>Marco Arroz</b> acabou de <b>abrir</b> o mapa de comissões de <b>${mrefLabel(envio.mes_referencia)}</b>.</p>
-      <p style="color:#667">Está a rever os valores. Quando concluir, recebes o mapa revisto.</p>
+      <p>${who === 'cc' ? '📄' : '👀'} ${corpo}</p>
       <p style="color:#9aa4b2;font-size:12px;margin-top:24px">Host Hotel Systems · Move beyond expectations.</p>
     </div>`
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL], subject: `👀 O Marco abriu o mapa — ${mrefLabel(envio.mes_referencia)}`, html }),
+      body: JSON.stringify({ from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL], subject, html }),
     })
     if (!r.ok) return res.status(502).json({ error: 'Resend: ' + (await r.text()) })
-    return res.status(200).json({ ok: true })
+    return res.status(200).json({ ok: true, who })
   } catch (e) {
     return res.status(500).json({ error: String(e?.message || e) })
   }

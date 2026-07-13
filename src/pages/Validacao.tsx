@@ -49,7 +49,7 @@ export default function Validacao() {
       registado.current = true
       const primeiraVez = !(e as any).aberto_em
       supabase.from('envios').update({ aberto_em: (e as any).aberto_em || new Date().toISOString(), aberto_contagem: ((e as any).aberto_contagem || 0) + 1 }).eq('id', (e as any).id)
-      if (primeiraVez) fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) }).catch(() => {})
+      if (primeiraVez) fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'diretor' }) }).catch(() => {})
     }
     const [{ data: d }, { data: c }] = await Promise.all([
       supabase.from('definicoes').select('*').eq('id', 1).single(),
