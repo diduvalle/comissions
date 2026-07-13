@@ -29,7 +29,6 @@ export default function Painel() {
   const [envMsg, setEnvMsg] = useState('')
   const [editar, setEditar] = useState<Comissao | null>(null)
   const [hist, setHist] = useState<Comissao | null>(null)
-  const [importar, setImportar] = useState(false)
   const [copiadoP, setCopiadoP] = useState(false)
   const [q, setQ] = useState('')
   const [fEstado, setFEstado] = useState<'' | Estado>('')
@@ -163,12 +162,9 @@ export default function Painel() {
           {!aberto && selFechado && <span title="O diretor já reviu e concluiu este mês" className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 px-2 py-1"><IconLock className="w-3 h-3" /> concluído pelo diretor</span>}
         </div>
         {!aberto && (
-          <div className="flex items-center gap-2">
-            <button onClick={() => setImportar(true)} className="bg-white border text-host-navy text-sm font-semibold rounded-lg px-4 py-2 hover:bg-gray-50">+ Importar do pipeline</button>
-            <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-5 py-2 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
-              {selFechado ? 'Reenviar' : 'Enviar'}
-            </button>
-          </div>
+          <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-5 py-2 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
+            {selFechado ? 'Reenviar' : 'Enviar'}
+          </button>
         )}
       </div>
 
@@ -306,88 +302,6 @@ export default function Painel() {
 
       {editar && <EditarLinha comissao={editar} produtos={produtos} clientes={clientes} onClose={() => setEditar(null)} onSaved={carregar} />}
       {hist && <HistoricoLinha comissao={hist} onClose={() => setHist(null)} />}
-      {importar && <ImportarPipeline produtos={produtos} existentes={new Set(comissoes.map((c) => String(c.numero_projeto)))} mes={sel} onClose={() => setImportar(false)} onImported={carregar} />}
-    </div>
-  )
-}
-
-function ImportarPipeline({ produtos, existentes, mes, onClose, onImported }: { produtos: Produto[]; existentes: Set<string>; mes: string; onClose: () => void; onImported: () => void }) {
-  const [pv, setPv] = useState<any[]>([])
-  const [sel, setSel] = useState<Set<string>>(new Set())
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const setupProd = produtos.find((p) => /setup/i.test(p.tipo))
-  const saasProd = produtos.find((p) => /saas/i.test(p.tipo) && p.tipo.includes('<')) || produtos.find((p) => /saas/i.test(p.tipo))
-
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase.from('projeto_valores').select('numero_projeto,cliente,setup,saas_mes,marca')
-      const cand = ((data as any) || [])
-        .filter((p: any) => !existentes.has(String(p.numero_projeto)) && (Number(p.setup) > 0 || Number(p.saas_mes) > 0))
-        .sort((a: any, b: any) => Number(b.numero_projeto) - Number(a.numero_projeto))
-      setPv(cand); setLoading(false)
-    })()
-  }, [])
-
-  const estCom = (p: any) => Number(p.setup || 0) * 0.02 + Number(p.saas_mes || 0) * 12 * 0.03
-  const toggle = (n: string) => setSel((s) => { const x = new Set(s); x.has(n) ? x.delete(n) : x.add(n); return x })
-
-  async function importar() {
-    if (!sel.size) return
-    setBusy(true)
-    try {
-      const hoje = hojeISO()
-      const rows: any[] = []
-      for (const p of pv.filter((x) => sel.has(String(x.numero_projeto)))) {
-        const cliente_id = await getOrCreateCliente(p.cliente || `Projeto ${p.numero_projeto}`)
-        const base = { numero_projeto: String(p.numero_projeto), data_adjudicacao: hoje, cliente_id, estado: 'pendente', mes_referencia: mes, observacoes: null }
-        if (Number(p.setup) > 0 && setupProd) {
-          const v = Number(p.setup); const pct = Number(setupProd.percentagem_comissao)
-          rows.push({ ...base, produto_id: setupProd.id, valor_venda: v, percentagem: pct, comissao_calculada: Math.round(v * pct) / 100, is_saas: false, valor_mensal_saas: null })
-        }
-        if (Number(p.saas_mes) > 0 && saasProd) {
-          const v = Number(p.saas_mes) * 12; const pct = Number(saasProd.percentagem_comissao)
-          rows.push({ ...base, produto_id: saasProd.id, valor_venda: v, percentagem: pct, comissao_calculada: Math.round(v * pct) / 100, is_saas: true, valor_mensal_saas: Number(p.saas_mes) })
-        }
-      }
-      const { error } = await supabase.from('comissoes').insert(rows)
-      if (error) throw error
-      onImported(); onClose()
-    } catch (e: any) { alert('Erro: ' + e.message) } finally { setBusy(false) }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-5 max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-host-navy">Importar do pipeline</h3>
-        <p className="text-sm text-gray-500 mb-3">Projetos com valores da plataforma ainda <b>sem comissão lançada</b>. Escolhe os que queres criar (Setup + SaaS) em <b>{mrefLabel(mes)}</b>. Podes ajustar depois.</p>
-        {loading ? <p className="text-gray-400">A carregar…</p> : pv.length === 0 ? <p className="text-gray-400 text-sm">Nada por importar — todos os projetos com valor já têm comissão. 🎯</p> : (
-          <>
-            <div className="flex items-center justify-between text-sm mb-2">
-              <button onClick={() => setSel(sel.size === pv.length ? new Set() : new Set(pv.map((p) => String(p.numero_projeto))))} className="text-host-blue font-medium">{sel.size === pv.length ? 'Limpar' : 'Selecionar todos'}</button>
-              <span className="text-gray-500">{sel.size} selecionado(s)</span>
-            </div>
-            <div className="overflow-y-auto border rounded-lg divide-y">
-              {pv.map((p) => {
-                const n = String(p.numero_projeto)
-                return (
-                  <label key={n} className="flex items-center gap-3 px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer">
-                    <input type="checkbox" checked={sel.has(n)} onChange={() => toggle(n)} />
-                    <span className="font-semibold text-host-navy w-16">{n}</span>
-                    <span className="flex-1 truncate">{p.cliente} {p.marca && <span className="text-gray-400">· {p.marca}</span>}</span>
-                    <span className="text-gray-500 whitespace-nowrap">{Number(p.setup) > 0 ? `Setup ${eur(p.setup)}` : ''} {Number(p.saas_mes) > 0 ? `· SaaS ${eur(p.saas_mes)}/m` : ''}</span>
-                    <span className="text-host-navy font-semibold whitespace-nowrap w-16 text-right">~{eur(estCom(p))}</span>
-                  </label>
-                )
-              })}
-            </div>
-          </>
-        )}
-        <div className="flex items-center justify-end gap-2 mt-4">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border text-sm">Fechar</button>
-          <button onClick={importar} disabled={busy || !sel.size} className="px-4 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold disabled:opacity-40">{busy ? 'A importar…' : `Importar ${sel.size || ''}`}</button>
-        </div>
-      </div>
     </div>
   )
 }
