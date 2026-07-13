@@ -6,11 +6,13 @@ import Resumo from './pages/Resumo'
 import Definicoes from './pages/Definicoes'
 import Envios from './pages/Envios'
 import Validacao from './pages/Validacao'
+import VerEnvio from './pages/VerEnvio'
 
 export default function App() {
   return (
     <Routes>
       <Route path="/validacao/:token" element={<Validacao />} />
+      <Route path="/ver/:token" element={<VerEnvio />} />
       <Route
         path="/"
         element={

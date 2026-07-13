@@ -216,6 +216,10 @@ export default function Definicoes() {
           <label>Nome do diretor<input value={def.diretor_nome} onChange={(e) => set('diretor_nome', e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
           <label>Email do diretor<input value={def.diretor_email} onChange={(e) => set('diretor_email', e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
           <label>PIN de acesso<input value={def.pin} onChange={(e) => set('pin', e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
+          <label className="col-span-2">Email de contabilidade (CC — só leitura)
+            <input value={def.cc_email ?? ''} onChange={(e) => set('cc_email', e.target.value)} placeholder="ex.: contabilidade@hostpms.com" className="mt-1 w-full border rounded px-2 py-1.5" />
+            <span className="block text-xs text-gray-400 mt-1">Ao enviar o mapa ao diretor, esta pessoa recebe (em paralelo) um link <b>só de leitura</b> — vê o mapa e o total a pagar, sem editar e sem o bónus/mensagens. Deixa em branco para não enviar.</span>
+          </label>
         </div>
       </Section>
     </div>

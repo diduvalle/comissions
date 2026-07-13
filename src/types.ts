@@ -55,6 +55,7 @@ export interface Definicoes {
   msg_dir_confirma: string | null
   msg_dir_bonus: string | null
   msg_dir_sem_bonus: string | null
+  cc_email: string | null
 }
 
 export interface Historico {

@@ -63,7 +63,28 @@ export default async function handler(req, res) {
       method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado: 'enviado', data_envio: new Date().toISOString() }),
     })
-    return res.status(200).json({ ok: true, to: def?.diretor_email, id: out.id })
+
+    // Contabilidade em CC — email paralelo com link SÓ DE LEITURA (sem edição, sem bónus/piadas)
+    let cc = null
+    if (def?.cc_email) {
+      const linkRO = `https://comissions.cr0x.org/ver/${token}`
+      const htmlRO = `<div style="font-family:Inter,Arial,sans-serif;color:#0F1E2E;font-size:14px;line-height:1.6">
+        <p>Olá,</p>
+        <p>Segue o mapa de comissões de <b>${mes}</b> (${n} linhas · total ${total}) para conhecimento.</p>
+        <p style="margin:20px 0"><a href="${linkRO}" style="display:inline-block;background:#1E63FF;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">Ver mapa (só leitura)</a></p>
+        <p style="color:#667">Link só de leitura — reflete sempre o estado atual do mapa.</p>
+        <p style="color:#9aa4b2;font-size:12px;margin-top:24px">Host Hotel Systems · Move beyond expectations.</p>
+      </div>`
+      try {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: 'Comissões (Diogo Vale) <diogo.vale@cr0x.org>', to: [def.cc_email], reply_to: 'diogo.vale@hostpms.com', subject: `Comissões ${mes} (só leitura)`, html: htmlRO }),
+        })
+        cc = def.cc_email
+      } catch { /* não falha o envio principal */ }
+    }
+    return res.status(200).json({ ok: true, to: def?.diretor_email, cc, id: out.id })
   } catch (e) {
     return res.status(500).json({ error: String(e?.message || e) })
   }

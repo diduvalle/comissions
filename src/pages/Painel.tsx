@@ -141,7 +141,7 @@ export default function Painel() {
     try {
       const r = await fetch('/api/enviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: tok }) })
       const out = await r.json()
-      setEnvMsg(r.ok ? `✓ Email enviado para ${out.to}` : `Erro: ${out.error}`)
+      setEnvMsg(r.ok ? `✓ Email enviado para ${out.to}${out.cc ? ` (CC só-leitura: ${out.cc})` : ''}` : `Erro: ${out.error}`)
     } catch (e: any) { setEnvMsg('Erro: ' + e.message) }
   }
 
