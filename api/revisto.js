@@ -1,5 +1,6 @@
 // Função serverless — o diretor submete "Revisto": envia ao gestor (Diogo) o ponto
 // de situação do mês e marca o envio como concluído.
+import { logEmail } from './_emaillog.js'
 const SB = 'https://bhurcadussdjohbngekq.supabase.co'
 const SB_KEY = 'sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU'
 const GESTOR_EMAIL = 'diogo.vale@hostpms.com'
@@ -63,6 +64,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({ from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL], reply_to: 'marco.arroz@hostpms.com', subject: `✓ Revisto — ${mrefLabel(envio.mes_referencia)} — a pagar ${eur(aPagar)}`, html }),
     })
     const out = await r.json()
+    await logEmail({ tipo: 'revisto', para: GESTOR_EMAIL, assunto: `✓ Revisto — ${mrefLabel(envio.mes_referencia)} — a pagar ${eur(aPagar)}`, corpo: html, envio_id: String(envio.id), resend_id: out?.id, estado: r.ok ? 'enviado' : 'erro', erro: r.ok ? null : JSON.stringify(out) })
     if (!r.ok) return res.status(502).json({ error: 'Resend: ' + JSON.stringify(out) })
 
     await fetch(`${SB}/rest/v1/envios?id=eq.${envio.id}`, { method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'concluido' }) })

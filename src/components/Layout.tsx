@@ -24,6 +24,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {tab('/', 'Painel')}
             {tab('/resumo', 'Analytics')}
             {tab('/envios', 'Envios')}
+            {tab('/emails', 'Emails')}
             {tab('/definicoes', 'Definições')}
           </nav>
         </div>

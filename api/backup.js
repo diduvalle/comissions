@@ -1,5 +1,6 @@
 // Backup automático mensal: exporta todas as comissões para CSV e envia por email
 // ao gestor. Chamado pelo Vercel Cron (ver vercel.json) no dia 1 de cada mês.
+import { logEmail } from './_emaillog.js'
 const SB = 'https://bhurcadussdjohbngekq.supabase.co'
 const SB_KEY = 'sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU'
 const GESTOR_EMAIL = 'diogo.vale@hostpms.com'
@@ -45,16 +46,19 @@ export default async function handler(req, res) {
       <p>Em anexo o ficheiro com <b>${rows.length}</b> comissões (total ${new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(totCom)}).</p>
       <p style="color:#9aa4b2;font-size:12px;margin-top:24px">Host Hotel Systems · Move beyond expectations.</p>
     </div>`
+    const assunto = `💾 Backup comissões — ${hoje} (${rows.length} linhas)`
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL],
-        subject: `💾 Backup comissões — ${hoje} (${rows.length} linhas)`,
+        subject: assunto,
         html, attachments: [{ filename: `comissoes-${hoje}.csv`, content: b64 }],
       }),
     })
-    if (!r.ok) return res.status(502).json({ error: 'Resend: ' + (await r.text()) })
+    const rt = r.ok ? null : await r.text()
+    await logEmail({ tipo: 'backup', para: GESTOR_EMAIL, assunto, corpo: html, estado: r.ok ? 'enviado' : 'erro', erro: rt })
+    if (!r.ok) return res.status(502).json({ error: 'Resend: ' + rt })
     return res.status(200).json({ ok: true, linhas: rows.length })
   } catch (e) {
     return res.status(500).json({ error: String(e?.message || e) })

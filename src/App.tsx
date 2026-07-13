@@ -5,6 +5,7 @@ import Painel from './pages/Painel'
 import Resumo from './pages/Resumo'
 import Definicoes from './pages/Definicoes'
 import Envios from './pages/Envios'
+import Emails from './pages/Emails'
 import Validacao from './pages/Validacao'
 import VerEnvio from './pages/VerEnvio'
 
@@ -39,6 +40,16 @@ export default function App() {
           <PinGate>
             <Layout>
               <Envios />
+            </Layout>
+          </PinGate>
+        }
+      />
+      <Route
+        path="/emails"
+        element={
+          <PinGate>
+            <Layout>
+              <Emails />
             </Layout>
           </PinGate>
         }

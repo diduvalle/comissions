@@ -1,6 +1,7 @@
 // Avisa o gestor (Diogo) quando ALGUÉM abre o mapa pela 1ª vez.
 // who='diretor' → abriu a página de validação (link editável).
 // who='cc'      → contabilidade abriu a vista só-leitura (/ver).
+import { logEmail } from './_emaillog.js'
 const SB = 'https://bhurcadussdjohbngekq.supabase.co'
 const SB_KEY = 'sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU'
 const GESTOR_EMAIL = 'diogo.vale@hostpms.com'
@@ -18,7 +19,7 @@ export default async function handler(req, res) {
   if (!token) return res.status(400).json({ error: 'token em falta' })
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
   try {
-    const envio = (await (await fetch(`${SB}/rest/v1/envios?token=eq.${token}&select=mes_referencia`, { headers: h })).json())[0]
+    const envio = (await (await fetch(`${SB}/rest/v1/envios?token=eq.${token}&select=id,mes_referencia`, { headers: h })).json())[0]
     if (!envio) return res.status(404).json({ error: 'Envio não encontrado' })
     const def = (await (await fetch(`${SB}/rest/v1/definicoes?id=eq.1&select=diretor_nome,cc_email`, { headers: h })).json())[0] || {}
     const mes = mrefLabel(envio.mes_referencia)
@@ -41,7 +42,9 @@ export default async function handler(req, res) {
       headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL], subject, html }),
     })
-    if (!r.ok) return res.status(502).json({ error: 'Resend: ' + (await r.text()) })
+    const rt = r.ok ? null : await r.text()
+    await logEmail({ tipo: who === 'cc' ? 'aviso-abertura-cc' : 'aviso-abertura-diretor', para: GESTOR_EMAIL, assunto: subject, corpo: html, envio_id: String(envio.id), estado: r.ok ? 'enviado' : 'erro', erro: rt })
+    if (!r.ok) return res.status(502).json({ error: 'Resend: ' + rt })
     return res.status(200).json({ ok: true, who })
   } catch (e) {
     return res.status(500).json({ error: String(e?.message || e) })

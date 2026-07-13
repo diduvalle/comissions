@@ -1,5 +1,6 @@
 // Função serverless (Vercel) — envia o email do mês ao diretor via Resend.
 // A RESEND_API_KEY vem das variáveis de ambiente do Vercel (secreta).
+import { logEmail } from './_emaillog.js'
 const SB = 'https://bhurcadussdjohbngekq.supabase.co'
 const SB_KEY = 'sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU'
 const ABBR = ['', 'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
@@ -57,6 +58,7 @@ export default async function handler(req, res) {
       }),
     })
     const out = await r.json()
+    await logEmail({ tipo: 'mapa-diretor', para: def?.diretor_email, assunto: subject, corpo: html, envio_id: String(envio.id), resend_id: out?.id, estado: r.ok ? 'enviado' : 'erro', erro: r.ok ? null : JSON.stringify(out) })
     if (!r.ok) return res.status(502).json({ error: 'Resend: ' + JSON.stringify(out) })
 
     await fetch(`${SB}/rest/v1/envios?id=eq.${envio.id}`, {
@@ -76,11 +78,13 @@ export default async function handler(req, res) {
         <p style="color:#9aa4b2;font-size:12px;margin-top:24px">Host Hotel Systems · Move beyond expectations.</p>
       </div>`
       try {
-        await fetch('https://api.resend.com/emails', {
+        const rc = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ from: 'Comissões (Diogo Vale) <diogo.vale@cr0x.org>', to: [def.cc_email], reply_to: 'diogo.vale@hostpms.com', subject: `Comissões ${mes} (só leitura)`, html: htmlRO }),
         })
+        const outc = await rc.json().catch(() => ({}))
+        await logEmail({ tipo: 'mapa-cc', para: def.cc_email, assunto: `Comissões ${mes} (só leitura)`, corpo: htmlRO, envio_id: String(envio.id), resend_id: outc?.id, estado: rc.ok ? 'enviado' : 'erro', erro: rc.ok ? null : JSON.stringify(outc) })
         cc = def.cc_email
       } catch { /* não falha o envio principal */ }
     }
