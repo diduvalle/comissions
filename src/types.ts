@@ -29,6 +29,7 @@ export interface Comissao {
   estado: Estado
   valor_pago: number | null
   partilhada: boolean
+  finalizada: boolean
   observacoes: string | null
   mes_referencia: string
   created_at?: string
