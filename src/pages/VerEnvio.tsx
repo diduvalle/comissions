@@ -30,7 +30,8 @@ export default function VerEnvio() {
       // avisa o gestor quando a contabilidade abre (1ª vez), distinto do diretor
       if (!registado.current && !(e as any).cc_aberto_em) {
         registado.current = true
-        supabase.from('envios').update({ cc_aberto_em: new Date().toISOString() }).eq('id', (e as any).id)
+        // await obrigatório: sem ele o supabase-js nunca envia o pedido
+        await supabase.from('envios').update({ cc_aberto_em: new Date().toISOString() }).eq('id', (e as any).id)
         fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'cc' }) }).catch(() => {})
       }
       const [{ data: d }, { data: c }] = await Promise.all([
