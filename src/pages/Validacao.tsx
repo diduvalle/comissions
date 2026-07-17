@@ -17,6 +17,11 @@ function devido(c: Comissao): number {
   const com = Number(c.comissao_calculada || 0)
   return c.partilhada ? Math.round(com * 50) / 100 : com
 }
+// % foi alterada face à base do produto? (para destacar o que o diretor mexeu)
+function pctAlterada(c: Comissao): boolean {
+  const base = Number(c.produto?.percentagem_comissao ?? NaN)
+  return !isNaN(base) && Number(c.percentagem) !== base
+}
 function estadoAuto(c: Comissao, pago: number): Estado {
   const d = devido(c)
   if (pago > 0 && pago >= d - 0.005) return 'paga'
@@ -35,6 +40,8 @@ export default function Validacao() {
   const [erro, setErro] = useState('')
   const [revMsg, setRevMsg] = useState('')
   const [aba, setAba] = useState<'validacao' | 'analytics'>('validacao')
+  const [toast, setToast] = useState('')
+  const flash = (msg = '✓ Guardado') => { setToast(msg); setTimeout(() => setToast(''), 1800) }
   const [links, setLinks] = useState<Record<string, string>>({})
   const registado = useRef(false)
 
@@ -68,7 +75,15 @@ export default function Validacao() {
   async function patch(c: Comissao, p: Partial<Comissao>) {
     // atualização otimista (sem reload da página) — fluxo ágil
     setLinhas((prev) => prev.map((x) => (x.id === c.id ? { ...x, ...p } : x)))
-    try { await updateComissao(c, p, 'diretor') } catch (e: any) { alert('Erro: ' + e.message); carregar() }
+    try { await updateComissao(c, p, 'diretor'); flash() } catch (e: any) { alert('Erro: ' + e.message); carregar() }
+  }
+
+  // O diretor pode ajustar a % — recalcula a comissão e reavalia o estado. Fica no histórico.
+  function setPct(c: Comissao, v: number) {
+    const pct = Number(v) || 0
+    const novaCom = Math.round(Number(c.valor_venda || 0) * pct) / 100
+    const cNovo = { ...c, percentagem: pct, comissao_calculada: novaCom }
+    patch(c, { percentagem: pct, comissao_calculada: novaCom, estado: estadoAuto(cNovo, Number(c.valor_pago || 0)) })
   }
 
   function setPago(c: Comissao, v: number | null) {
@@ -92,6 +107,7 @@ export default function Validacao() {
   async function guardarBonus(valor: number, nota: string) {
     if (!envio) return
     await supabase.from('envios').update({ bonus: valor, bonus_descricao: nota }).eq('id', envio.id)
+    flash()
   }
 
   function adicionarNota(c: Comissao, texto: string) {
@@ -205,7 +221,14 @@ export default function Validacao() {
                   <span className={`rounded px-2 py-0.5 text-xs font-medium ${estadoCls[c.estado]}`}>{c.estado}</span>
                 </div>
                 <div className="font-medium text-host-navy">{c.cliente?.nome}</div>
-                <div className="text-sm text-gray-500 mb-2">{c.produto?.tipo} · {Number(c.percentagem)}% · venda {eur(c.valor_venda)}</div>
+                <div className="text-sm text-gray-500 mb-2 flex items-center gap-1 flex-wrap">
+                  <span>{c.produto?.tipo} · venda {eur(c.valor_venda)} ·</span>
+                  <input key={`${c.id}-pctm-${c.percentagem}`} type="number" step="0.5" min="0" defaultValue={Number(c.percentagem)} inputMode="decimal"
+                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                    onBlur={(e) => { const v = Number(e.target.value); if (v !== Number(c.percentagem)) setPct(c, v) }}
+                    className={`w-14 text-right border rounded px-1 py-0.5 ${pctAlterada(c) ? 'text-host-blue font-bold border-host-blue/50' : ''}`} />
+                  <span>%</span>
+                </div>
                 <div className="flex items-center justify-between text-sm mb-2">
                   <span>Comissão <b>{eur(c.comissao_calculada)}</b>{c.partilhada && <span className="text-host-blue"> (50/50 → {eur(devido(c))})</span>}</span>
                   <button onClick={() => togglePisco(c)}
@@ -234,8 +257,8 @@ export default function Validacao() {
         <div className="hidden md:block bg-white rounded-xl border">
           <table className="w-full table-fixed text-[13px]">
             <colgroup>
-              <col className="w-[6%]" /><col className="w-[7%]" /><col className="w-[12%]" /><col className="w-[11%]" />
-              <col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[8%]" /><col className="w-[9%]" /><col className="w-[14%]" />
+              <col className="w-[6%]" /><col className="w-[6%]" /><col className="w-[12%]" /><col className="w-[10%]" />
+              <col className="w-[8%]" /><col className="w-[5%]" /><col className="w-[8%]" /><col className="w-[6%]" /><col className="w-[9%]" /><col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[14%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-gray-500 border-b">
@@ -244,6 +267,7 @@ export default function Validacao() {
                 <th className="px-2 py-2 font-medium">Cliente</th>
                 <th className="px-2 py-2 font-medium">Produto</th>
                 <th className="px-2 py-2 font-medium text-right">Valor</th>
+                <th className="px-2 py-2 font-medium text-right" title="Podes ajustar — a comissão recalcula">%</th>
                 <th className="px-2 py-2 font-medium text-right">Comissão</th>
                 <th className="px-2 py-2 font-medium text-center">Partilha</th>
                 <th className="px-2 py-2 font-medium text-right">Valor pago</th>
@@ -262,8 +286,15 @@ export default function Validacao() {
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
                   <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
-                  <td className="px-2 py-1.5 truncate" title={`${c.produto?.tipo} (${Number(c.percentagem)}%)`}>{c.produto?.tipo} <span className="text-gray-400">{Number(c.percentagem)}%</span></td>
+                  <td className="px-2 py-1.5 truncate" title={c.produto?.tipo}>{c.produto?.tipo}</td>
                   <td className="px-2 py-1.5 text-right whitespace-nowrap" title={c.is_saas && c.valor_mensal_saas ? `${eur(c.valor_mensal_saas)}/mês × 12` : ''}>{eur(c.valor_venda)}</td>
+                  <td className="px-2 py-1.5 text-right">
+                    <input key={`${c.id}-pct-${c.percentagem}`} type="number" step="0.5" min="0" defaultValue={Number(c.percentagem)} inputMode="decimal"
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                      onBlur={(e) => { const v = Number(e.target.value); if (v !== Number(c.percentagem)) setPct(c, v) }}
+                      title={pctAlterada(c) ? `Alterada — base do produto: ${Number(c.produto?.percentagem_comissao)}%` : 'Ajusta se necessário — a comissão recalcula'}
+                      className={`w-full text-right border rounded px-1 py-1 ${pctAlterada(c) ? 'text-host-blue font-bold border-host-blue/50' : ''}`} />
+                  </td>
                   <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
                   <td className="px-2 py-1.5 text-center">
                     <button onClick={() => togglePisco(c)}
@@ -275,7 +306,8 @@ export default function Validacao() {
                   <td className="px-2 py-1.5 text-right">
                     <div className="flex items-center gap-1">
                       <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
-                        onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
+                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                      onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
                         className="w-full min-w-0 text-right border rounded px-1 py-1" />
                       <button onClick={() => pagarComissao(c)} title="Pagar a comissão toda (1 clique)"
                         className="shrink-0 text-green-600 hover:text-white hover:bg-green-600 border border-green-600 rounded px-1.5 py-1 text-xs font-bold transition-colors">✓</button>
@@ -355,6 +387,13 @@ export default function Validacao() {
 
         <p className="text-center text-xs text-gray-400 mt-6 italic">Move beyond expectations.</p>
       </main>
+
+      {/* Confirmação visível de que ficou gravado no servidor */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 z-50 bg-host-navy text-white text-sm font-semibold rounded-lg px-4 py-2.5 shadow-elevated animate-fade-up">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
