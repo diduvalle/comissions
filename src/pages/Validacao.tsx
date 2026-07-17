@@ -255,77 +255,77 @@ export default function Validacao() {
 
         {/* ===== Ecrã grande: tabela ===== */}
         <div className="hidden md:block bg-white rounded-xl border">
-          <table className="w-full table-fixed text-[13px]">
+          <table className="w-full table-fixed text-[12px]">
             <colgroup>
-              <col className="w-[6%]" /><col className="w-[6%]" /><col className="w-[12%]" /><col className="w-[10%]" />
+              <col className="w-[5.5%]" /><col className="w-[7.5%]" /><col className="w-[12%]" /><col className="w-[9%]" />
               <col className="w-[8%]" /><col className="w-[5%]" /><col className="w-[8%]" /><col className="w-[6%]" /><col className="w-[9%]" /><col className="w-[7%]" /><col className="w-[9%]" /><col className="w-[14%]" />
             </colgroup>
             <thead>
               <tr className="text-left text-gray-500 border-b">
-                <th className="px-2 py-2 font-medium">Nº</th>
-                <th className="px-2 py-2 font-medium">Data</th>
-                <th className="px-2 py-2 font-medium">Cliente</th>
-                <th className="px-2 py-2 font-medium">Produto</th>
-                <th className="px-2 py-2 font-medium text-right">Valor</th>
-                <th className="px-2 py-2 font-medium text-right" title="Podes ajustar — a comissão recalcula">%</th>
-                <th className="px-2 py-2 font-medium text-right">Comissão</th>
-                <th className="px-2 py-2 font-medium text-center">Partilha</th>
-                <th className="px-2 py-2 font-medium text-right">Valor pago</th>
-                <th className="px-2 py-2 font-medium text-right">Pendente</th>
-                <th className="px-2 py-2 font-medium">Estado</th>
-                <th className="px-2 py-2 font-medium">Observações</th>
+                <th className="px-1.5 py-2 font-medium">Nº</th>
+                <th className="px-1.5 py-2 font-medium text-center">Data</th>
+                <th className="px-1.5 py-2 font-medium">Cliente</th>
+                <th className="px-1.5 py-2 font-medium">Produto</th>
+                <th className="px-1.5 py-2 font-medium text-right">Valor</th>
+                <th className="px-1.5 py-2 font-medium text-center" title="Podes ajustar — a comissão recalcula">%</th>
+                <th className="px-1.5 py-2 font-medium text-right">Comissão</th>
+                <th className="px-1.5 py-2 font-medium text-center">Partilha</th>
+                <th className="px-1.5 py-2 font-medium text-right">Valor pago</th>
+                <th className="px-1.5 py-2 font-medium text-right">Pendente</th>
+                <th className="px-1.5 py-2 font-medium text-center">Estado</th>
+                <th className="px-1.5 py-2 font-medium">Observações</th>
               </tr>
             </thead>
             <tbody>
               {linhas.map((c) => (
                 <tr key={c.id} className={`border-b last:border-0 hover:bg-gray-50 ${c.estado === 'paga' ? 'bg-green-50' : c.estado === 'parcial' ? 'bg-orange-50' : ''}`}>
-                  <td className="px-2 py-1.5 truncate" title={c.numero_projeto}>
+                  <td className="px-1.5 py-1.5 truncate tabular-nums" title={c.numero_projeto}>
                     {links[c.numero_projeto]
                       ? <a href={platformUrl(links[c.numero_projeto])} target="_blank" rel="noreferrer" className="text-host-blue hover:underline">{c.numero_projeto}</a>
                       : c.numero_projeto}
                   </td>
-                  <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
-                  <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
-                  <td className="px-2 py-1.5 truncate" title={c.produto?.tipo}>{c.produto?.tipo}</td>
-                  <td className="px-2 py-1.5 text-right whitespace-nowrap" title={c.is_saas && c.valor_mensal_saas ? `${eur(c.valor_mensal_saas)}/mês × 12` : ''}>{eur(c.valor_venda)}</td>
-                  <td className="px-2 py-1.5 text-right">
+                  <td className="px-1.5 py-1.5 text-center whitespace-nowrap tabular-nums">{fmtDate(c.data_adjudicacao)}</td>
+                  <td className="px-1.5 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
+                  <td className="px-1.5 py-1.5 truncate" title={c.produto?.tipo}>{c.produto?.tipo}</td>
+                  <td className="px-1.5 py-1.5 text-right whitespace-nowrap tabular-nums" title={c.is_saas && c.valor_mensal_saas ? `${eur(c.valor_mensal_saas)}/mês × 12` : ''}>{eur(c.valor_venda)}</td>
+                  <td className="px-1.5 py-1.5">
                     <input key={`${c.id}-pct-${c.percentagem}`} type="number" step="0.5" min="0" defaultValue={Number(c.percentagem)} inputMode="decimal"
                       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                       onBlur={(e) => { const v = Number(e.target.value); if (v !== Number(c.percentagem)) setPct(c, v) }}
                       title={pctAlterada(c) ? `Alterada — base do produto: ${Number(c.produto?.percentagem_comissao)}%` : 'Ajusta se necessário — a comissão recalcula'}
-                      className={`w-full text-right border rounded px-1 py-1 ${pctAlterada(c) ? 'text-host-blue font-bold border-host-blue/50' : ''}`} />
+                      className={`w-full text-center tabular-nums border rounded px-0.5 py-1 ${pctAlterada(c) ? 'text-host-blue font-bold border-host-blue/50' : ''}`} />
                   </td>
-                  <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
-                  <td className="px-2 py-1.5 text-center">
+                  <td className="px-1.5 py-1.5 text-right font-semibold whitespace-nowrap tabular-nums">{eur(c.comissao_calculada)}</td>
+                  <td className="px-1.5 py-1.5 text-center">
                     <button onClick={() => togglePisco(c)}
                       title={c.partilhada ? 'Partilhada 50/50 — só pagas metade. Clica para desativar.' : 'Marcar como partilhada 50/50 (pagas só metade; a outra metade é de um colega)'}
-                      className={`text-xs font-bold rounded-md px-2 py-1 border transition-colors ${c.partilhada ? 'bg-host-blue text-white border-host-blue shadow-sm' : 'bg-white text-gray-400 border-gray-300 hover:border-host-blue hover:text-host-blue'}`}>
+                      className={`text-[11px] font-bold rounded-md px-1.5 py-1 border transition-colors ${c.partilhada ? 'bg-host-blue text-white border-host-blue shadow-sm' : 'bg-white text-gray-400 border-gray-300 hover:border-host-blue hover:text-host-blue'}`}>
                       {c.partilhada ? '50/50' : '½'}
                     </button>
                   </td>
-                  <td className="px-2 py-1.5 text-right">
+                  <td className="px-1.5 py-1.5">
                     <div className="flex items-center gap-1">
                       <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
                         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                      onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
-                        className="w-full min-w-0 text-right border rounded px-1 py-1" />
+                        onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
+                        className="w-full min-w-0 text-right tabular-nums border rounded px-1 py-1" />
                       <button onClick={() => pagarComissao(c)} title="Pagar a comissão toda (1 clique)"
-                        className="shrink-0 text-green-600 hover:text-white hover:bg-green-600 border border-green-600 rounded px-1.5 py-1 text-xs font-bold transition-colors">✓</button>
+                        className="shrink-0 text-green-600 hover:text-white hover:bg-green-600 border border-green-600 rounded px-1 py-1 text-[11px] font-bold transition-colors">✓</button>
                     </div>
                   </td>
-                  <td className="px-2 py-1.5 text-right text-xs">
+                  <td className="px-1.5 py-1.5 text-right whitespace-nowrap tabular-nums">
                     {devido(c) - Number(c.valor_pago || 0) > 0.005
                       ? <span className="text-orange-600 font-medium">{eur(devido(c) - Number(c.valor_pago || 0))}</span>
                       : <span className="text-gray-300">—</span>}
                   </td>
-                  <td className="px-2 py-1.5">
-                    <select value={c.estado} onChange={(e) => patch(c, { estado: e.target.value as Estado })} className={`w-full rounded px-1 py-1 text-xs font-medium ${estadoCls[c.estado]}`}>
+                  <td className="px-1.5 py-1.5">
+                    <select value={c.estado} onChange={(e) => patch(c, { estado: e.target.value as Estado })} className={`w-full rounded px-1 py-1 text-[11px] font-medium text-center ${estadoCls[c.estado]}`}>
                       <option value="pendente">pendente</option>
                       <option value="parcial">parcial</option>
                       <option value="paga">paga</option>
                     </select>
                   </td>
-                  <td className="px-2 py-1.5 align-top">
+                  <td className="px-1.5 py-1.5 align-top">
                     {c.observacoes && <div className="text-[11px] text-gray-600 whitespace-pre-wrap mb-1 max-h-20 overflow-auto">{c.observacoes}</div>}
                     <input placeholder="+ nota…"
                       onKeyDown={(e) => { if (e.key === 'Enter') { adicionarNota(c, (e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = '' } }}
