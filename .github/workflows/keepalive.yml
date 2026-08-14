@@ -1,0 +1,59 @@
+# ---------------------------------------------------------------------------
+# Keep-alive do Supabase (plano gratuito)
+#
+# Porquê: no plano gratuito, o projeto Supabase é PAUSADO ao fim de 7 dias
+# sem atividade. Repor é manual e, se demorar demasiado, o projeto pode ser
+# APAGADO. Este workflow evita isso: uma vez por dia faz uma leitura mínima
+# à base de dados (via API PostgREST), o que conta como atividade.
+#
+# Como funciona: pede 1 linha da tabela "definicoes" e verifica o código HTTP.
+#   - HTTP 200  -> tudo bem, o projeto continua ativo.
+#   - != 200    -> o passo FALHA de propósito, e o GitHub envia-te um email
+#                  de "workflow failed" -> serve de ALERTA (algo está mal).
+#
+# Sem custos e sem secrets: a chave "publishable" já é pública (está no
+# frontend da app), por isso pode ficar aqui sem problema de segurança.
+#
+# Disparo: automático (diário) e também manual (botão "Run workflow" no
+# separador Actions do GitHub, graças ao workflow_dispatch).
+# ---------------------------------------------------------------------------
+
+name: keep-alive-supabase
+
+on:
+  schedule:
+    # Todos os dias às 06:17 UTC. (As horas do cron do GitHub são sempre UTC
+    # e podem atrasar alguns minutos — irrelevante para um keep-alive diário.)
+    - cron: '17 6 * * *'
+  workflow_dispatch: {}   # permite correr à mão a qualquer momento
+
+# Evita corridas sobrepostas se um disparo manual coincidir com o agendado.
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ler 1 linha via PostgREST (falha se != HTTP 200)
+        run: |
+          # Chave publishable (pública) e endpoint de leitura mínima.
+          KEY="sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU"
+          URL="https://bhurcadussdjohbngekq.supabase.co/rest/v1/definicoes?select=id&limit=1"
+
+          # Faz o pedido e captura apenas o código HTTP (corpo descartado).
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${KEY}" \
+            -H "Authorization: Bearer ${KEY}" \
+            "${URL}")
+
+          echo "Resposta da base de dados: HTTP ${CODE}"
+
+          # Se não for 200, termina com erro -> o GitHub avisa por email.
+          if [ "${CODE}" != "200" ]; then
+            echo "::error::Keep-alive falhou — a base de dados devolveu HTTP ${CODE} (esperado 200)."
+            exit 1
+          fi
+
+          echo "Keep-alive OK — o projeto Supabase continua ativo."
