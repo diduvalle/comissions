@@ -21,6 +21,41 @@ export default function VerEnvio() {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
   const registado = useRef(false)
+  const abrirRef = useRef<{ ed: any; envio: any } | null>(null)
+
+  // Regista a abertura só após interação humana (evita os scanners de segurança do email).
+  async function registarAbertura() {
+    if (registado.current || !abrirRef.current) return
+    registado.current = true
+    const { ed: edRow, envio: e } = abrirRef.current
+    if (edRow) {
+      const primeira = !edRow.aberto_em
+      await supabase.from('envio_destinatarios').update({ aberto_em: edRow.aberto_em || new Date().toISOString(), aberto_contagem: (edRow.aberto_contagem || 0) + 1 }).eq('id', edRow.id)
+      if (primeira) fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, evento: 'abriu' }) }).catch(() => {})
+    } else if (e && !e.cc_aberto_em) {
+      await supabase.from('envios').update({ cc_aberto_em: new Date().toISOString() }).eq('id', e.id)
+      fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'cc' }) }).catch(() => {})
+    }
+  }
+
+  // gatilho humano: 1ª interação real (rato/scroll/toque/tecla) ou 20s visível
+  useEffect(() => {
+    if (!envio) return
+    const eventos = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'click']
+    let timer: any = null
+    const disparar = () => { limpar(); registarAbertura() }
+    const armarTimer = () => { if (document.visibilityState === 'visible' && !timer) timer = setTimeout(disparar, 20000) }
+    const onVis = () => { if (document.visibilityState !== 'visible' && timer) { clearTimeout(timer); timer = null } else armarTimer() }
+    function limpar() {
+      eventos.forEach((ev) => window.removeEventListener(ev, disparar))
+      document.removeEventListener('visibilitychange', onVis)
+      if (timer) clearTimeout(timer)
+    }
+    eventos.forEach((ev) => window.addEventListener(ev, disparar, { passive: true }))
+    document.addEventListener('visibilitychange', onVis)
+    armarTimer()
+    return limpar
+  }, [envio])
 
   useEffect(() => {
     (async () => {
@@ -36,19 +71,8 @@ export default function VerEnvio() {
       }
       if (!e) { setErro('Link inválido ou expirado.'); setLoading(false); return }
       setEnvio(e as any)
-      // rastreio da abertura (1ª vez) - avisa o gestor, sem o destinatário saber
-      if (!registado.current) {
-        registado.current = true
-        if (edRow) {
-          const primeira = !(edRow as any).aberto_em
-          // await obrigatório: sem ele o supabase-js nunca envia o pedido
-          await supabase.from('envio_destinatarios').update({ aberto_em: (edRow as any).aberto_em || new Date().toISOString(), aberto_contagem: ((edRow as any).aberto_contagem || 0) + 1 }).eq('id', (edRow as any).id)
-          if (primeira) fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, evento: 'abriu' }) }).catch(() => {})
-        } else if (!(e as any).cc_aberto_em) {
-          await supabase.from('envios').update({ cc_aberto_em: new Date().toISOString() }).eq('id', (e as any).id)
-          fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'cc' }) }).catch(() => {})
-        }
-      }
+      // guarda o necessário; a abertura só é registada após interação humana (useEffect acima)
+      abrirRef.current = { ed: edRow, envio: e }
       const [{ data: d }, { data: c }] = await Promise.all([
         supabase.from('definicoes').select('*').eq('id', 1).single(),
         supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').in('id', (e as any).comissao_ids),

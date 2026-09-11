@@ -48,6 +48,43 @@ export default function Validacao() {
   const [nomeAtor, setNomeAtor] = useState('diretor')
   const registado = useRef(false)
   const edicaoRef = useRef(false)
+  const abrirRef = useRef<{ ed: any; envio: any } | null>(null)
+
+  // Regista a abertura (BD + aviso ao gestor). Só é chamada após interação humana,
+  // para não contar visitas automáticas dos scanners de segurança do email.
+  async function registarAbertura() {
+    if (registado.current || !abrirRef.current) return
+    registado.current = true
+    const { ed: edRow, envio: e } = abrirRef.current
+    if (edRow) {
+      const primeira = !edRow.aberto_em
+      await supabase.from('envio_destinatarios').update({ aberto_em: edRow.aberto_em || new Date().toISOString(), aberto_contagem: (edRow.aberto_contagem || 0) + 1 }).eq('id', edRow.id)
+      if (primeira) fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, evento: 'abriu' }) }).catch(() => {})
+    } else if (e) {
+      const primeiraVez = !e.aberto_em
+      await supabase.from('envios').update({ aberto_em: e.aberto_em || new Date().toISOString(), aberto_contagem: (e.aberto_contagem || 0) + 1 }).eq('id', e.id)
+      if (primeiraVez) fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'diretor' }) }).catch(() => {})
+    }
+  }
+
+  // Arma o "gatilho humano": 1ª interação real (rato/scroll/toque/tecla) ou 20s visível.
+  useEffect(() => {
+    if (!envio) return
+    const eventos = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'click']
+    let timer: any = null
+    const disparar = () => { limpar(); registarAbertura() }
+    const armarTimer = () => { if (document.visibilityState === 'visible' && !timer) timer = setTimeout(disparar, 20000) }
+    const onVis = () => { if (document.visibilityState !== 'visible' && timer) { clearTimeout(timer); timer = null } else armarTimer() }
+    function limpar() {
+      eventos.forEach((ev) => window.removeEventListener(ev, disparar))
+      document.removeEventListener('visibilitychange', onVis)
+      if (timer) clearTimeout(timer)
+    }
+    eventos.forEach((ev) => window.addEventListener(ev, disparar, { passive: true }))
+    document.addEventListener('visibilitychange', onVis)
+    armarTimer()
+    return limpar
+  }, [envio])
 
   async function carregar() {
     setLoading(true)
@@ -66,19 +103,9 @@ export default function Validacao() {
     setEnvio(e as any)
     setBonus(Number((e as any).bonus || 0))
     setBonusNota((e as any).bonus_descricao || '')
-    if (!registado.current) {
-      registado.current = true
-      if (edRow) {
-        const primeira = !(edRow as any).aberto_em
-        await supabase.from('envio_destinatarios').update({ aberto_em: (edRow as any).aberto_em || new Date().toISOString(), aberto_contagem: ((edRow as any).aberto_contagem || 0) + 1 }).eq('id', (edRow as any).id)
-        if (primeira) fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, evento: 'abriu' }) }).catch(() => {})
-        if ((edRow as any).primeira_edicao_em) edicaoRef.current = true
-      } else {
-        const primeiraVez = !(e as any).aberto_em
-        await supabase.from('envios').update({ aberto_em: (e as any).aberto_em || new Date().toISOString(), aberto_contagem: ((e as any).aberto_contagem || 0) + 1 }).eq('id', (e as any).id)
-        if (primeiraVez) fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'diretor' }) }).catch(() => {})
-      }
-    }
+    if (edRow && (edRow as any).primeira_edicao_em) edicaoRef.current = true
+    // guarda o que é preciso para registar a abertura (só após interação humana — ver useEffect)
+    abrirRef.current = { ed: edRow, envio: e }
     const [{ data: d }, { data: c }] = await Promise.all([
       supabase.from('definicoes').select('*').eq('id', 1).single(),
       supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').in('id', (e as any).comissao_ids),
