@@ -326,8 +326,8 @@ export default function Painel() {
 
       {/* Janela de validação antes de enviar - mostra para quem vai e como */}
       {mostrarEnviar && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !enviando && setMostrarEnviar(false)}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-5 max-h-[85vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-[6vh] overflow-y-auto" onClick={() => !enviando && setMostrarEnviar(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-5 my-auto" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-host-navy mb-1">Enviar mapa de {mrefLabel(sel)}</h3>
             <p className="text-sm text-gray-500 mb-4">Confirma para quem vai e com que acesso antes de enviar.</p>
 
