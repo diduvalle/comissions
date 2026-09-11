@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Comissao, Produto, Cliente, Estado, Destinatario, Papel } from '../types'
-import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl, nextMref } from '../utils'
+import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl, nextMref, porNumero } from '../utils'
 import { updateComissao, getOrCreateCliente } from '../data'
 import { IconClock, IconDownload, IconLock, IconSearch, IconWarn, IconEdit, IconTrash, IconCheck } from '../components/icons'
 
@@ -102,7 +102,7 @@ export default function Painel() {
     if (fEstado && c.estado !== fEstado) return false
     if (!termo) return true
     return String(c.numero_projeto).toLowerCase().includes(termo) || (c.cliente?.nome || '').toLowerCase().includes(termo)
-  })
+  }).sort(porNumero)
   const aFiltrar = termo !== '' || fEstado !== ''
 
   async function patch(c: Comissao, p: Partial<Comissao>) {

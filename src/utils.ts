@@ -51,6 +51,15 @@ export function emAberto(estado: string): boolean {
   return estado !== 'paga'
 }
 
+// Ordena por Nº de projeto (crescente, numérico); o mesmo Nº fica agrupado e
+// ordenado por produto (ex.: Setup e SaaS do mesmo projeto ficam juntos).
+export function porNumero(a: any, b: any): number {
+  const na = parseInt(String(a.numero_projeto).replace(/\D/g, ''), 10) || 0
+  const nb = parseInt(String(b.numero_projeto).replace(/\D/g, ''), 10) || 0
+  if (na !== nb) return na - nb
+  return String(a.produto?.tipo || '').localeCompare(String(b.produto?.tipo || ''))
+}
+
 // Mensagens automáticas mostradas ao diretor na página de validação (valores-base).
 // Marcadores: {bonus} = valor do bónus · {aPagar} = total a pagar do mês.
 export const MSG_DIR = {
