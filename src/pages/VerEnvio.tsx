@@ -90,7 +90,8 @@ export default function VerEnvio() {
   if (erro) return <div className="min-h-screen flex items-center justify-center text-gray-600">{erro}</div>
 
   const totCom = linhas.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
-  const totPago = linhas.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
+  // só o que é pago neste ciclo (parciais de meses anteriores não voltam a somar)
+  const totPago = linhas.reduce((s, c) => s + Math.max(0, Number(c.valor_pago || 0) - Number((c as any).pago_anterior || 0)), 0)
   const bonus = Number(envio?.bonus || 0)
   const aPagar = totPago + bonus
 

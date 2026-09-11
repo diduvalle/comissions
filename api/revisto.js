@@ -23,11 +23,13 @@ export default async function handler(req, res) {
     if (!envio) return res.status(404).json({ error: 'Envio não encontrado' })
     const ids = (envio.comissao_ids || [])
     const linhas = ids.length
-      ? await (await fetch(`${SB}/rest/v1/comissoes?id=in.(${ids.join(',')})&select=numero_projeto,comissao_calculada,valor_pago,estado,observacoes,cliente:clientes(nome),produto:produtos(tipo)`, { headers: h })).json()
+      ? await (await fetch(`${SB}/rest/v1/comissoes?id=in.(${ids.join(',')})&select=id,numero_projeto,comissao_calculada,valor_pago,pago_anterior,estado,observacoes,cliente:clientes(nome),produto:produtos(tipo)`, { headers: h })).json()
       : []
 
+    // pago NESTE ciclo = valor_pago - o que já tinha sido pago em meses anteriores
+    const pagoCiclo = (c) => Math.max(0, Number(c.valor_pago || 0) - Number(c.pago_anterior || 0))
     const totCom = linhas.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
-    const totPago = linhas.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
+    const totPago = linhas.reduce((s, c) => s + pagoCiclo(c), 0)
     const aPagar = totPago + Number(envio.bonus || 0)
     const rows = linhas.map((c) => `
       <tr>
@@ -35,7 +37,7 @@ export default async function handler(req, res) {
         <td style="padding:6px 8px;border-bottom:1px solid #eee">${c.cliente?.nome || ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee">${c.produto?.tipo || ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${eur(c.comissao_calculada)}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${c.valor_pago == null ? '-' : eur(c.valor_pago)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${pagoCiclo(c) > 0 ? eur(pagoCiclo(c)) : '-'}${Number(c.pago_anterior || 0) > 0 ? `<br><span style="color:#9aa4b2;font-size:11px">(${eur(c.pago_anterior)} antes)</span>` : ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee">${c.estado}</td>
       </tr>`).join('')
 
@@ -69,6 +71,14 @@ export default async function handler(req, res) {
     if (!r.ok) return res.status(502).json({ error: 'Resend: ' + JSON.stringify(out) })
 
     await fetch(`${SB}/rest/v1/envios?id=eq.${envio.id}`, { method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'concluido' }) })
+
+    // "arruma" os pagamentos deste ciclo: o que ficou pago passa a pago_anterior,
+    // para que numa transição futura (linha parcial) não volte a somar em "a pagar".
+    const aBancar = linhas.filter((c) => Number(c.valor_pago || 0) > Number(c.pago_anterior || 0))
+    await Promise.all(aBancar.map((c) => fetch(`${SB}/rest/v1/comissoes?id=eq.${c.id}`, {
+      method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ pago_anterior: Number(c.valor_pago || 0) }),
+    })))
+
     return res.status(200).json({ ok: true, aPagar })
   } catch (e) {
     return res.status(500).json({ error: String(e?.message || e) })

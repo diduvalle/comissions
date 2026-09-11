@@ -93,7 +93,8 @@ export default function Painel() {
     : [...transitadas, ...proprias]
 
   const totComissao = visiveis.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
-  const totPago = visiveis.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
+  // "Pago" = só o que é pago neste ciclo (exclui parciais já pagas em meses anteriores)
+  const totPago = visiveis.reduce((s, c) => s + Math.max(0, Number(c.valor_pago || 0) - Number((c as any).pago_anterior || 0)), 0)
   const porPagar = visiveis.filter((c) => emAberto(c)).reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
 
   // pesquisa + filtro (só afeta as linhas mostradas; totais e envio usam o mês completo)

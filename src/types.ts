@@ -28,6 +28,7 @@ export interface Comissao {
   valor_mensal_saas: number | null
   estado: Estado
   valor_pago: number | null
+  pago_anterior?: number | null
   partilhada: boolean
   finalizada: boolean
   observacoes: string | null

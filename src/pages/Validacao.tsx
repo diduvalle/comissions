@@ -17,6 +17,10 @@ function devido(c: Comissao): number {
   const com = Number(c.comissao_calculada || 0)
   return c.partilhada ? Math.round(com * 50) / 100 : com
 }
+// quanto foi pago NESTE ciclo (exclui o que já tinha sido pago em meses anteriores)
+function pagoCiclo(c: Comissao): number {
+  return Math.max(0, Number(c.valor_pago || 0) - Number((c as any).pago_anterior || 0))
+}
 // % foi alterada face à base do produto? (para destacar o que o diretor mexeu)
 function pctAlterada(c: Comissao): boolean {
   const base = Number(c.produto?.percentagem_comissao ?? NaN)
@@ -209,7 +213,9 @@ export default function Validacao() {
   if (erro) return <div className="min-h-screen flex items-center justify-center text-gray-600">{erro}</div>
 
   const totComissao = linhas.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
-  const totPago = linhas.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
+  // só conta o que é pago NESTE ciclo (parciais de meses anteriores não voltam a somar)
+  const totPago = linhas.reduce((s, c) => s + pagoCiclo(c), 0)
+  const jaPagoAntes = linhas.reduce((s, c) => s + Number((c as any).pago_anterior || 0), 0)
   const totalAPagar = totPago + Number(bonus || 0)
   const tratadas = linhas.filter((c) => c.estado === 'paga').length
   const falta = linhas.reduce((s, c) => s + Math.max(0, devido(c) - Number(c.valor_pago || 0)), 0)
@@ -303,6 +309,7 @@ export default function Validacao() {
                   <button onClick={() => pagarComissao(c)} title="Pagar a comissão toda" className="shrink-0 bg-green-600 text-white text-sm font-semibold rounded px-3 py-1.5">✓ Pagar</button>
                 </div>
                 {pend > 0.005 && <div className="text-xs text-orange-600 mb-2">Pendente: {eur(pend)}</div>}
+                {Number((c as any).pago_anterior || 0) > 0.005 && <div className="text-[11px] text-gray-400 mb-2">já pago em meses anteriores: {eur((c as any).pago_anterior)}</div>}
                 {c.observacoes && <div className="text-[11px] text-gray-600 whitespace-pre-wrap mb-1">{c.observacoes}</div>}
                 <input placeholder="+ nota…"
                   onKeyDown={(e) => { if (e.key === 'Enter') { adicionarNota(c, (e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = '' } }}
@@ -376,6 +383,9 @@ export default function Validacao() {
                     {devido(c) - Number(c.valor_pago || 0) > 0.005
                       ? <span className="text-orange-600 font-medium">{eur(devido(c) - Number(c.valor_pago || 0))}</span>
                       : <span className="text-gray-300">-</span>}
+                    {Number((c as any).pago_anterior || 0) > 0.005 && (
+                      <span className="block text-[10px] text-gray-400" title="Já pago em meses anteriores">já pago {eur((c as any).pago_anterior)}</span>
+                    )}
                   </td>
                   <td className="px-1.5 py-1.5">
                     <select value={c.estado} onChange={(e) => patch(c, { estado: e.target.value as Estado })} className={`w-full rounded px-1 py-1 text-[11px] font-medium text-center ${estadoCls[c.estado]}`}>
@@ -427,7 +437,8 @@ export default function Validacao() {
           <div className="relative overflow-hidden bg-gradient-to-br from-host-ink via-host-navy to-[#1c3047] text-white rounded-xl p-5 flex flex-col justify-center shadow-elevated">
             <div className="absolute -top-12 -right-8 w-44 h-44 rounded-full bg-host-blue/20 blur-3xl pointer-events-none" />
             <div className="flex justify-between text-sm text-white/70"><span>Total comissões ({linhas.length})</span><span>{eur(totComissao)}</span></div>
-            <div className="flex justify-between text-sm text-white/70"><span>Marcado para pagar</span><span>{eur(totPago)}</span></div>
+            {jaPagoAntes > 0.005 && <div className="flex justify-between text-sm text-white/50"><span>Já pago em meses anteriores</span><span>{eur(jaPagoAntes)}</span></div>}
+            <div className="flex justify-between text-sm text-white/70"><span>Marcado para pagar (este mês)</span><span>{eur(totPago)}</span></div>
             <div className="flex justify-between text-sm text-white/70"><span>Bónus</span><span>{eur(bonus)}</span></div>
             <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-white/20">
               <span>A pagar - {envio && mrefLabel(envio.mes_referencia)}</span><span>{eur(totalAPagar)}</span>
