@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
-import type { Definicoes as Def, Produto } from '../types'
+import type { Definicoes as Def, Produto, Destinatario, Papel } from '../types'
 import { MSG_DIR } from '../utils'
+
+const PAPEL_LABEL: Record<Papel, string> = { leitura: 'Leitura', editar: 'Editar', submeter: 'Editar + Submeter' }
 
 // Atalho (bookmarklet): em Comercial > Propostas, recolhe valores + links + marca num clique.
 const BOOKMARKLET = `javascript:(async()=>{try{var EXT={0:'Host',1:'Hstays',2:'Clever',3:'hey!',5:'ProfileNow'};var S={},V=[],L=[];Ext.ComponentQuery.query('grid').forEach(function(g){var s=g.getStore&&g.getStore();if(s&&s.getCount&&s.getCount()>0&&s.getAt(0).data.hasOwnProperty('Nr')&&s.getAt(0).data.hasOwnProperty('TotalSum')&&s.getAt(0).data.hasOwnProperty('ProjectId')){s.each(function(r){var d=r.data;if(d.Deleted)return;var nr=String(d.Nr);if(!nr||S[nr])return;S[nr]=1;V.push({numero_projeto:nr,cliente:d.ProfileName||null,setup:Math.round(Number(d.TotalSum||0)*100)/100,saas_mes:Math.round(Number(d.SaaSSum||0)*100)/100,marca:EXT[d.ExtType]||'Outro'});if(d.ProjectId>0)L.push({numero_projeto:nr,data_id:String(d.ProjectId)})})}});if(!V.length){alert('Abre Comercial > Propostas e os separadores das marcas primeiro.');return}var SB='https://bhurcadussdjohbngekq.supabase.co',K='sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU',H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'};try{var r1=await fetch(SB+'/rest/v1/projeto_valores?on_conflict=numero_projeto',{method:'POST',headers:H,body:JSON.stringify(V)});var r2=L.length?await fetch(SB+'/rest/v1/projeto_links?on_conflict=numero_projeto',{method:'POST',headers:H,body:JSON.stringify(L)}):{ok:true};if(r1.ok&&r2.ok){alert('OK! '+V.length+' valores e '+L.length+' links atualizados no COMISSIONS.')}else{try{await navigator.clipboard.writeText(JSON.stringify(V))}catch(_){}alert('Envio direto bloqueado (CSP). Copiei '+V.length+' valores - cola no chat com atualiza.')}}catch(e){try{await navigator.clipboard.writeText(JSON.stringify(V))}catch(_){}alert('Envio direto bloqueado. Copiei os valores - cola no chat com atualiza.')}}catch(e){alert('Erro: '+(e.message||e))}})();`
@@ -28,6 +30,29 @@ export default function Definicoes() {
   const [linksText, setLinksText] = useState('')
   const [linksMsg, setLinksMsg] = useState('')
   const [bmCopiado, setBmCopiado] = useState(false)
+  const [dests, setDests] = useState<Destinatario[]>([])
+  const [novoDest, setNovoDest] = useState<{ nome: string; email: string; papel: Papel }>({ nome: '', email: '', papel: 'leitura' })
+  const [destMsg, setDestMsg] = useState('')
+
+  async function carregarDests() {
+    const { data } = await supabase.from('destinatarios').select('*').order('ordem').order('criado_em')
+    setDests((data as any) || [])
+  }
+  async function guardarDest(d: Destinatario) {
+    const { error } = await supabase.from('destinatarios').update({ nome: d.nome, email: d.email.trim(), papel: d.papel, ativo: d.ativo }).eq('id', d.id)
+    setDestMsg(error ? 'Erro: ' + error.message : '✓ Guardado'); setTimeout(() => setDestMsg(''), 2000)
+    if (!error) carregarDests()
+  }
+  async function addDest() {
+    if (!novoDest.email.trim()) { setDestMsg('Falta o email.'); return }
+    const { error } = await supabase.from('destinatarios').insert({ nome: novoDest.nome || null, email: novoDest.email.trim(), papel: novoDest.papel, ordem: dests.length + 1 })
+    if (error) { setDestMsg(error.message.includes('duplicate') ? 'Esse email já existe.' : 'Erro: ' + error.message); return }
+    setNovoDest({ nome: '', email: '', papel: 'leitura' }); carregarDests()
+  }
+  async function removeDest(id: string) {
+    if (!confirm('Remover este destinatário?')) return
+    await supabase.from('destinatarios').delete().eq('id', id); carregarDests()
+  }
 
   async function importarLinks() {
     const linhas = linksText.split('\n').map((l) => l.trim()).filter(Boolean)
@@ -49,7 +74,7 @@ export default function Definicoes() {
     ])
     setDef(d as any); setProdutos((p as any) || [])
   }
-  useEffect(() => { carregar() }, [])
+  useEffect(() => { carregar(); carregarDests() }, [])
 
   async function guardarDef() {
     if (!def) return
@@ -84,8 +109,39 @@ export default function Definicoes() {
         </div>
       </div>
 
+      {/* Destinatários das comissões */}
+      <Section title="Destinatários das comissões" defaultOpen>
+        <p className="text-sm text-gray-500 mb-3">
+          Quem recebe o mapa mensal e com que <b>poder</b>. <b>Leitura</b> = só vê · <b>Editar</b> = ajusta valores/%/bónus · <b>Editar + Submeter</b> = edita e fecha o mês. {destMsg && <span className="text-green-600 font-medium ml-2">{destMsg}</span>}
+        </p>
+        <div className="space-y-2">
+          {dests.map((d, i) => (
+            <div key={d.id} className="flex flex-wrap items-center gap-2">
+              <input value={d.nome || ''} onChange={(e) => { const c = [...dests]; c[i] = { ...d, nome: e.target.value }; setDests(c) }} placeholder="Nome" className="w-40 border rounded px-2 py-1.5 text-sm" />
+              <input value={d.email} onChange={(e) => { const c = [...dests]; c[i] = { ...d, email: e.target.value }; setDests(c) }} placeholder="email@empresa.com" className="flex-1 min-w-[180px] border rounded px-2 py-1.5 text-sm" />
+              <select value={d.papel} onChange={(e) => { const c = [...dests]; c[i] = { ...d, papel: e.target.value as Papel }; setDests(c) }} className="border rounded px-2 py-1.5 text-sm">
+                {(['leitura', 'editar', 'submeter'] as Papel[]).map((p) => <option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
+              </select>
+              <label className="text-xs text-gray-500 flex items-center gap-1"><input type="checkbox" checked={d.ativo} onChange={(e) => { const c = [...dests]; c[i] = { ...d, ativo: e.target.checked }; setDests(c) }} /> ativo</label>
+              <button onClick={() => guardarDest(dests[i])} className="text-host-blue text-sm font-semibold px-1">Guardar</button>
+              <button onClick={() => removeDest(d.id)} className="text-gray-400 hover:text-red-600 text-sm px-1" title="Remover">✕</button>
+            </div>
+          ))}
+          {dests.length === 0 && <p className="text-sm text-gray-400">Ainda sem destinatários — adiciona abaixo.</p>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t">
+          <input value={novoDest.nome} onChange={(e) => setNovoDest({ ...novoDest, nome: e.target.value })} placeholder="Nome" className="w-40 border rounded px-2 py-1.5 text-sm" />
+          <input value={novoDest.email} onChange={(e) => setNovoDest({ ...novoDest, email: e.target.value })} placeholder="email@empresa.com" className="flex-1 min-w-[180px] border rounded px-2 py-1.5 text-sm" />
+          <select value={novoDest.papel} onChange={(e) => setNovoDest({ ...novoDest, papel: e.target.value as Papel })} className="border rounded px-2 py-1.5 text-sm">
+            {(['leitura', 'editar', 'submeter'] as Papel[]).map((p) => <option key={p} value={p}>{PAPEL_LABEL[p]}</option>)}
+          </select>
+          <button onClick={addDest} className="bg-host-blue text-white text-sm font-semibold rounded px-3 py-1.5">+ Adicionar</button>
+        </div>
+        <p className="text-xs text-gray-400 mt-3">Na próxima fase, cada pessoa recebe um link à medida do seu papel e tu és notificada de tudo o que fazem (abrir, editar, submeter).</p>
+      </Section>
+
       {/* Comissão por produto */}
-      <Section title="Comissão por produto" defaultOpen>
+      <Section title="Comissão por produto">
         <p className="text-sm text-gray-500 mb-3">Percentagem aplicada a cada tipo de produto nas novas linhas.</p>
         <div className="space-y-2">
           {produtos.map((p, i) => (

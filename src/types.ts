@@ -39,6 +39,17 @@ export interface Comissao {
   produto?: Produto
 }
 
+export type Papel = 'leitura' | 'editar' | 'submeter'
+
+export interface Destinatario {
+  id: string
+  nome: string
+  email: string
+  papel: Papel
+  ativo: boolean
+  ordem: number
+}
+
 export interface Definicoes {
   id: number
   gestor_nome: string
