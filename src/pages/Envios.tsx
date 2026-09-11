@@ -69,10 +69,10 @@ export default function Envios() {
               <tr key={e.id} className="border-b last:border-0 hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium">{mrefLabel(e.mes_referencia)}</td>
                 <td className="px-3 py-2">{fmtDataHora(e.data_envio)}</td>
-                <td className="px-3 py-2 text-xs text-gray-600">{e.enviado_por || '—'} <span className="text-gray-400">→</span> {e.enviado_para || '—'}</td>
+                <td className="px-3 py-2 text-xs text-gray-600">{e.enviado_por || '-'} <span className="text-gray-400">→</span> {e.enviado_para || '-'}</td>
                 <td className="px-3 py-2 text-center">{(e.comissao_ids || []).length}</td>
                 <td className="px-3 py-2 text-right">{eur(e.total_comissoes)}</td>
-                <td className="px-3 py-2 text-right">{Number(e.bonus) ? eur(e.bonus) : '—'}</td>
+                <td className="px-3 py-2 text-right">{Number(e.bonus) ? eur(e.bonus) : '-'}</td>
                 <td className="px-3 py-2"><span className={`text-xs font-medium rounded px-2 py-1 ${estadoBadge[e.estado] || 'bg-gray-100 text-gray-700'}`}>{e.estado}</span></td>
                 <td className="px-3 py-2 text-xs">
                   {e.aberto_em
@@ -82,7 +82,7 @@ export default function Envios() {
                 <td className="px-3 py-2 text-right whitespace-nowrap">
                   <button onClick={() => copiar(e)} className="text-host-blue text-xs font-semibold mr-3">{copiado === e.id ? '✓ Copiado!' : 'Copiar link'}</button>
                   {e.estado === 'concluido'
-                    ? <span title="Concluído pelo diretor — guardado para histórico (não pode ser apagado)" className="inline-flex text-gray-400 cursor-default align-middle"><IconLock className="w-4 h-4" /></span>
+                    ? <span title="Concluído pelo diretor - guardado para histórico (não pode ser apagado)" className="inline-flex text-gray-400 cursor-default align-middle"><IconLock className="w-4 h-4" /></span>
                     : <button onClick={() => apagar(e)} title="Apagar envio" className="inline-flex text-gray-400 hover:text-red-600 align-middle"><IconTrash className="w-4 h-4" /></button>}
                 </td>
               </tr>

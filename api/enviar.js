@@ -1,4 +1,4 @@
-// Função serverless (Vercel) — envia o mapa do mês a CADA destinatário via Resend,
+// Função serverless (Vercel) - envia o mapa do mês a CADA destinatário via Resend,
 // com um link à medida do seu papel (leitura / editar / submeter) e rastreio individual.
 // A RESEND_API_KEY vem das variáveis de ambiente do Vercel (secreta).
 import { logEmail } from './_emaillog.js'
@@ -67,11 +67,11 @@ export default async function handler(req, res) {
           <p>Olá${d.nome ? ' ' + d.nome : ''},</p>
           <p>Segue o mapa de comissões de <b>${mes}</b> (${n} linhas · total ${total}) para conhecimento.</p>
           <p style="margin:20px 0"><a href="${link}" style="display:inline-block;background:#1E63FF;color:#fff;padding:11px 20px;border-radius:8px;text-decoration:none;font-weight:600">Ver mapa (só leitura)</a></p>
-          <p style="color:#667">Link só de leitura — reflete sempre o estado atual do mapa.</p>
+          <p style="color:#667">Link só de leitura - reflete sempre o estado atual do mapa.</p>
           <p style="color:#9aa4b2;font-size:12px;margin-top:24px">Host Hotel Systems · Move beyond expectations.</p>
         </div>`
       } else {
-        subject = M(def.email_assunto || 'Comissões para validação — {mes}')
+        subject = M(def.email_assunto || 'Comissões para validação - {mes}')
         const saudacao = def.email_saudacao ? `<p>${M(def.email_saudacao).replace(/\n/g, '<br>')}</p>` : `<p>Olá${d.nome ? ' ' + d.nome : ''},</p>`
         const resumo = def.email_mostrar_resumo ? `<p style="background:#f3f6fc;border-radius:8px;padding:10px 14px"><b>${mes}</b> · ${n} linhas · total ${total}</p>` : ''
         const corpoTxt = def.email_corpo ? `<p>${M(def.email_corpo).replace(/\n/g, '<br>')}</p>` : ''
@@ -87,7 +87,7 @@ export default async function handler(req, res) {
       const r = await enviarResend(d.email, subject, html)
       const out = await r.json().catch(() => ({}))
       await logEmail({ tipo: `mapa-${d.papel}`, para: d.email, assunto: subject, corpo: html, envio_id: String(envio.id), resend_id: out?.id, estado: r.ok ? 'enviado' : 'erro', erro: r.ok ? null : JSON.stringify(out) })
-      enviados.push({ email: d.email, papel: d.papel, estado: r.ok ? 'enviado' : 'erro' })
+      enviados.push({ nome: d.nome, email: d.email, papel: d.papel, link, estado: r.ok ? 'enviado' : 'erro' })
     }
 
     await fetch(`${SB}/rest/v1/envios?id=eq.${envio.id}`, {

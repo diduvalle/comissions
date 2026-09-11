@@ -101,13 +101,13 @@ export default function Validacao() {
   }
 
   async function patch(c: Comissao, p: Partial<Comissao>) {
-    // atualização otimista (sem reload da página) — fluxo ágil
+    // atualização otimista (sem reload da página) - fluxo ágil
     setLinhas((prev) => prev.map((x) => (x.id === c.id ? { ...x, ...p } : x)))
     marcarEdicao()
     try { await updateComissao(c, p, nomeAtor); flash() } catch (e: any) { alert('Erro: ' + e.message); carregar() }
   }
 
-  // O diretor pode ajustar a % — recalcula a comissão e reavalia o estado. Fica no histórico.
+  // O diretor pode ajustar a % - recalcula a comissão e reavalia o estado. Fica no histórico.
   function setPct(c: Comissao, v: number) {
     const pct = Number(v) || 0
     const novaCom = Math.round(Number(c.valor_venda || 0) * pct) / 100
@@ -161,7 +161,7 @@ export default function Validacao() {
       const out = await r.json()
       if (!r.ok) { setRevMsg(`Erro: ${out.error}`); return }
       if (ed) await supabase.from('envio_destinatarios').update({ submetido_em: new Date().toISOString() }).eq('id', ed.id)
-      // mensagem final (editável nas Definições) — com/sem bónus
+      // mensagem final (editável nas Definições) - com/sem bónus
       setRevMsg(temBonus
         ? (def?.msg_dir_bonus || MSG_DIR.bonus).replace('{bonus}', eur(bonus))
         : (def?.msg_dir_sem_bonus || MSG_DIR.semBonus).replace('{aPagar}', eur(out.aPagar)))
@@ -215,7 +215,7 @@ export default function Validacao() {
 
         {aba === 'validacao' && (<>
         <div className="mb-5">
-          <h1 className="text-2xl font-bold text-host-navy">Comissões para validação — {envio && mrefLabel(envio.mes_referencia)}</h1>
+          <h1 className="text-2xl font-bold text-host-navy">Comissões para validação - {envio && mrefLabel(envio.mes_referencia)}</h1>
           <p className="text-sm text-gray-500">Mapa enviado por {def?.gestor_nome} para validação.</p>
         </div>
 
@@ -234,7 +234,7 @@ export default function Validacao() {
 
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <button onClick={marcarTodasPagas} className="bg-green-600 text-white text-sm font-semibold rounded-lg px-4 py-2">Marcar todas como pagas</button>
-          <span className="text-xs text-gray-500">Escreve o "valor pago" (ou usa <b>✓</b> para pagar a comissão toda) em cada linha — fica <b>verde/paga</b> quando ≥ comissão, ou <b>laranja/parcial</b> se for menos. Botão <b>½</b> = comissão partilhada (pagas metade).</span>
+          <span className="text-xs text-gray-500">Escreve o "valor pago" (ou usa <b>✓</b> para pagar a comissão toda) em cada linha - fica <b>verde/paga</b> quando ≥ comissão, ou <b>laranja/parcial</b> se for menos. Botão <b>½</b> = comissão partilhada (pagas metade).</span>
         </div>
 
         {/* ===== Telemóvel: cartões ===== */}
@@ -270,7 +270,7 @@ export default function Validacao() {
                 </div>
                 <div className="flex items-center gap-2 mb-2">
                   <label className="text-xs text-gray-500">Pago</label>
-                  <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—" inputMode="decimal"
+                  <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="-" inputMode="decimal"
                     onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
                     className="flex-1 min-w-0 text-right border rounded px-2 py-1.5" />
                   <button onClick={() => pagarComissao(c)} title="Pagar a comissão toda" className="shrink-0 bg-green-600 text-white text-sm font-semibold rounded px-3 py-1.5">✓ Pagar</button>
@@ -299,7 +299,7 @@ export default function Validacao() {
                 <th className="px-1.5 py-2 font-medium">Cliente</th>
                 <th className="px-1.5 py-2 font-medium">Produto</th>
                 <th className="px-1.5 py-2 font-medium text-right">Valor</th>
-                <th className="px-1.5 py-2 font-medium text-center" title="Podes ajustar — a comissão recalcula">%</th>
+                <th className="px-1.5 py-2 font-medium text-center" title="Podes ajustar - a comissão recalcula">%</th>
                 <th className="px-1.5 py-2 font-medium text-right">Comissão</th>
                 <th className="px-1.5 py-2 font-medium text-center">Partilha</th>
                 <th className="px-1.5 py-2 font-medium text-right">Valor pago</th>
@@ -324,20 +324,20 @@ export default function Validacao() {
                     <input key={`${c.id}-pct-${c.percentagem}`} type="number" step="0.5" min="0" defaultValue={Number(c.percentagem)} inputMode="decimal"
                       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                       onBlur={(e) => { const v = Number(e.target.value); if (v !== Number(c.percentagem)) setPct(c, v) }}
-                      title={pctAlterada(c) ? `Alterada — base do produto: ${Number(c.produto?.percentagem_comissao)}%` : 'Ajusta se necessário — a comissão recalcula'}
+                      title={pctAlterada(c) ? `Alterada - base do produto: ${Number(c.produto?.percentagem_comissao)}%` : 'Ajusta se necessário - a comissão recalcula'}
                       className={`w-full text-center tabular-nums border rounded px-0.5 py-1 ${pctAlterada(c) ? 'text-host-blue font-bold border-host-blue/50' : ''}`} />
                   </td>
                   <td className="px-1.5 py-1.5 text-right font-semibold whitespace-nowrap tabular-nums">{eur(c.comissao_calculada)}</td>
                   <td className="px-1.5 py-1.5 text-center">
                     <button onClick={() => togglePisco(c)}
-                      title={c.partilhada ? 'Partilhada 50/50 — só pagas metade. Clica para desativar.' : 'Marcar como partilhada 50/50 (pagas só metade; a outra metade é de um colega)'}
+                      title={c.partilhada ? 'Partilhada 50/50 - só pagas metade. Clica para desativar.' : 'Marcar como partilhada 50/50 (pagas só metade; a outra metade é de um colega)'}
                       className={`text-[11px] font-bold rounded-md px-1.5 py-1 border transition-colors ${c.partilhada ? 'bg-host-blue text-white border-host-blue shadow-sm' : 'bg-white text-gray-400 border-gray-300 hover:border-host-blue hover:text-host-blue'}`}>
                       {c.partilhada ? '50/50' : '½'}
                     </button>
                   </td>
                   <td className="px-1.5 py-1.5">
                     <div className="flex items-center gap-1">
-                      <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="—"
+                      <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="-"
                         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                         onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
                         className="w-full min-w-0 text-right tabular-nums border rounded px-1 py-1" />
@@ -348,7 +348,7 @@ export default function Validacao() {
                   <td className="px-1.5 py-1.5 text-right whitespace-nowrap tabular-nums">
                     {devido(c) - Number(c.valor_pago || 0) > 0.005
                       ? <span className="text-orange-600 font-medium">{eur(devido(c) - Number(c.valor_pago || 0))}</span>
-                      : <span className="text-gray-300">—</span>}
+                      : <span className="text-gray-300">-</span>}
                   </td>
                   <td className="px-1.5 py-1.5">
                     <select value={c.estado} onChange={(e) => patch(c, { estado: e.target.value as Estado })} className={`w-full rounded px-1 py-1 text-[11px] font-medium text-center ${estadoCls[c.estado]}`}>
@@ -403,7 +403,7 @@ export default function Validacao() {
             <div className="flex justify-between text-sm text-white/70"><span>Marcado para pagar</span><span>{eur(totPago)}</span></div>
             <div className="flex justify-between text-sm text-white/70"><span>Bónus</span><span>{eur(bonus)}</span></div>
             <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-white/20">
-              <span>A pagar — {envio && mrefLabel(envio.mes_referencia)}</span><span>{eur(totalAPagar)}</span>
+              <span>A pagar - {envio && mrefLabel(envio.mes_referencia)}</span><span>{eur(totalAPagar)}</span>
             </div>
           </div>
         </div>
@@ -411,7 +411,7 @@ export default function Validacao() {
         {papel === 'submeter' ? (
         <div className="mt-6 flex flex-col items-center gap-2">
           <button onClick={enviarRevisto} className="bg-gradient-to-r from-green-600 to-emerald-500 text-white font-semibold rounded-xl px-7 py-3.5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
-            ✓ Revisto — submeter ao Diogo
+            ✓ Revisto - submeter ao Diogo
           </button>
           {revMsg && <span className="text-sm text-gray-600">{revMsg}</span>}
           <span className="text-xs text-gray-400">Envia ao Diogo o ponto de situação e o total a pagar deste mês.</span>

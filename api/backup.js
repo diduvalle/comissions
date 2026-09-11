@@ -42,11 +42,11 @@ export default async function handler(req, res) {
 
     const totCom = rows.reduce((s, r) => s + Number(r.comissao_calculada || 0), 0)
     const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0F1E2E;font-size:14px">
-      <h2>Backup mensal de comissões — ${hoje}</h2>
+      <h2>Backup mensal de comissões - ${hoje}</h2>
       <p>Em anexo o ficheiro com <b>${rows.length}</b> comissões (total ${new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(totCom)}).</p>
       <p style="color:#9aa4b2;font-size:12px;margin-top:24px">Host Hotel Systems · Move beyond expectations.</p>
     </div>`
-    const assunto = `💾 Backup comissões — ${hoje} (${rows.length} linhas)`
+    const assunto = `💾 Backup comissões - ${hoje} (${rows.length} linhas)`
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },

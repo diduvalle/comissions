@@ -36,7 +36,7 @@ export default function VerEnvio() {
       }
       if (!e) { setErro('Link inválido ou expirado.'); setLoading(false); return }
       setEnvio(e as any)
-      // rastreio da abertura (1ª vez) — avisa o gestor, sem o destinatário saber
+      // rastreio da abertura (1ª vez) - avisa o gestor, sem o destinatário saber
       if (!registado.current) {
         registado.current = true
         if (edRow) {
@@ -85,7 +85,7 @@ export default function VerEnvio() {
 
       <main className="max-w-[1100px] mx-auto px-6 py-6 animate-fade-up">
         <div className="mb-5">
-          <h1 className="text-2xl font-bold text-host-navy">Mapa de comissões — {envio && mrefLabel(envio.mes_referencia)}</h1>
+          <h1 className="text-2xl font-bold text-host-navy">Mapa de comissões - {envio && mrefLabel(envio.mes_referencia)}</h1>
           <p className="text-sm text-gray-500">Vista só de leitura · gerido por {def?.gestor_nome}</p>
         </div>
 
@@ -102,7 +102,7 @@ export default function VerEnvio() {
               </div>
               <div className="font-medium text-host-navy">{c.cliente?.nome}</div>
               <div className="text-sm text-gray-500">{c.produto?.tipo} · venda {eur(c.valor_venda)}</div>
-              <div className="flex justify-between text-sm mt-1"><span>Comissão <b>{eur(c.comissao_calculada)}</b></span><span className="text-gray-500">Pago {c.valor_pago != null ? eur(c.valor_pago) : '—'}</span></div>
+              <div className="flex justify-between text-sm mt-1"><span>Comissão <b>{eur(c.comissao_calculada)}</b></span><span className="text-gray-500">Pago {c.valor_pago != null ? eur(c.valor_pago) : '-'}</span></div>
             </div>
           ))}
         </div>
@@ -131,7 +131,7 @@ export default function VerEnvio() {
                   <td className="px-3 py-1.5">{c.produto?.tipo}</td>
                   <td className="px-3 py-1.5 text-right whitespace-nowrap">{eur(c.valor_venda)}</td>
                   <td className="px-3 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
-                  <td className="px-3 py-1.5 text-right text-gray-500 whitespace-nowrap">{c.valor_pago != null ? eur(c.valor_pago) : '—'}</td>
+                  <td className="px-3 py-1.5 text-right text-gray-500 whitespace-nowrap">{c.valor_pago != null ? eur(c.valor_pago) : '-'}</td>
                   <td className="px-3 py-1.5"><span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${estadoCls[c.estado]}`}>{c.estado}</span></td>
                 </tr>
               ))}
@@ -146,7 +146,7 @@ export default function VerEnvio() {
             <div className="flex justify-between text-sm text-white/70"><span>Total comissões ({linhas.length})</span><span>{eur(totCom)}</span></div>
             <div className="flex justify-between text-sm text-white/70"><span>Marcado para pagar</span><span>{eur(totPago)}</span></div>
             <div className="flex justify-between text-sm text-white/70"><span>Bónus</span><span>{eur(bonus)}</span></div>
-            <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-white/20"><span>A pagar — {envio && mrefLabel(envio.mes_referencia)}</span><span>{eur(aPagar)}</span></div>
+            <div className="flex justify-between text-lg font-bold mt-2 pt-2 border-t border-white/20"><span>A pagar - {envio && mrefLabel(envio.mes_referencia)}</span><span>{eur(aPagar)}</span></div>
           </div>
         </div>
 

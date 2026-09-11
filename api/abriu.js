@@ -26,11 +26,11 @@ export default async function handler(req, res) {
 
     let subject, corpo
     if (who === 'cc') {
-      subject = `📄 Contabilidade abriu o mapa (só leitura) — ${mes}`
+      subject = `📄 Contabilidade abriu o mapa (só leitura) - ${mes}`
       corpo = `A <b>contabilidade</b>${def.cc_email ? ` (${def.cc_email})` : ''} acabou de <b>abrir</b> a vista <b>só de leitura</b> do mapa de <b>${mes}</b>.`
     } else {
-      subject = `👀 ${def.diretor_nome || 'O diretor'} abriu o mapa (validação) — ${mes}`
-      corpo = `O teu <b>diretor</b>, <b>${def.diretor_nome || ''}</b>, acabou de <b>abrir</b> o mapa de <b>validação</b> de <b>${mes}</b>. Está a rever os valores — quando concluir, recebes o mapa revisto.`
+      subject = `👀 ${def.diretor_nome || 'O diretor'} abriu o mapa (validação) - ${mes}`
+      corpo = `O teu <b>diretor</b>, <b>${def.diretor_nome || ''}</b>, acabou de <b>abrir</b> o mapa de <b>validação</b> de <b>${mes}</b>. Está a rever os valores - quando concluir, recebes o mapa revisto.`
     }
 
     const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0F1E2E;font-size:14px">

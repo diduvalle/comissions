@@ -1,4 +1,4 @@
-// Função serverless — o diretor submete "Revisto": envia ao gestor (Diogo) o ponto
+// Função serverless - o diretor submete "Revisto": envia ao gestor (Diogo) o ponto
 // de situação do mês e marca o envio como concluído.
 import { logEmail } from './_emaillog.js'
 const SB = 'https://bhurcadussdjohbngekq.supabase.co'
@@ -35,12 +35,12 @@ export default async function handler(req, res) {
         <td style="padding:6px 8px;border-bottom:1px solid #eee">${c.cliente?.nome || ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee">${c.produto?.tipo || ''}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${eur(c.comissao_calculada)}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${c.valor_pago == null ? '—' : eur(c.valor_pago)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${c.valor_pago == null ? '-' : eur(c.valor_pago)}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee">${c.estado}</td>
       </tr>`).join('')
 
     const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0F1E2E;font-size:14px">
-      <h2 style="color:#0F1E2E">Mapa revisto — ${mrefLabel(envio.mes_referencia)}</h2>
+      <h2 style="color:#0F1E2E">Mapa revisto - ${mrefLabel(envio.mes_referencia)}</h2>
       <p>${por} reviu as comissões. Ponto de situação:</p>
       <table style="border-collapse:collapse;width:100%;font-size:13px">
         <thead><tr style="text-align:left;color:#667">
@@ -62,10 +62,10 @@ export default async function handler(req, res) {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL], subject: `✓ Revisto — ${mrefLabel(envio.mes_referencia)} — a pagar ${eur(aPagar)}`, html }),
+      body: JSON.stringify({ from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL], subject: `✓ Revisto - ${mrefLabel(envio.mes_referencia)} - a pagar ${eur(aPagar)}`, html }),
     })
     const out = await r.json()
-    await logEmail({ tipo: 'revisto', para: GESTOR_EMAIL, assunto: `✓ Revisto — ${mrefLabel(envio.mes_referencia)} — a pagar ${eur(aPagar)}`, corpo: html, envio_id: String(envio.id), resend_id: out?.id, estado: r.ok ? 'enviado' : 'erro', erro: r.ok ? null : JSON.stringify(out) })
+    await logEmail({ tipo: 'revisto', para: GESTOR_EMAIL, assunto: `✓ Revisto - ${mrefLabel(envio.mes_referencia)} - a pagar ${eur(aPagar)}`, corpo: html, envio_id: String(envio.id), resend_id: out?.id, estado: r.ok ? 'enviado' : 'erro', erro: r.ok ? null : JSON.stringify(out) })
     if (!r.ok) return res.status(502).json({ error: 'Resend: ' + JSON.stringify(out) })
 
     await fetch(`${SB}/rest/v1/envios?id=eq.${envio.id}`, { method: 'PATCH', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: 'concluido' }) })

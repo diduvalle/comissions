@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Chaves PÚBLICAS (publishable) — seguras no frontend.
+// Chaves PÚBLICAS (publishable) - seguras no frontend.
 const url = import.meta.env.VITE_SUPABASE_URL || 'https://bhurcadussdjohbngekq.supabase.co'
 const key =
   import.meta.env.VITE_SUPABASE_ANON_KEY ||

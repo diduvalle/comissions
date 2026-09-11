@@ -9,5 +9,5 @@ export async function logEmail(row) {
       headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify(row),
     })
-  } catch { /* ignora — o registo não pode quebrar o envio */ }
+  } catch { /* ignora - o registo não pode quebrar o envio */ }
 }

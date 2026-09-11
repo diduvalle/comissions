@@ -47,7 +47,7 @@ export default function Emails() {
           {tipos.map((t) => <option key={t} value={t}>{LABEL[t] || t}</option>)}
         </select>
       </div>
-      <p className="text-sm text-gray-500 mb-5">Registo de todos os emails que a app enviou — o quê, para quem e quando.</p>
+      <p className="text-sm text-gray-500 mb-5">Registo de todos os emails que a app enviou - o quê, para quem e quando.</p>
 
       <div className="bg-white rounded-xl border overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">

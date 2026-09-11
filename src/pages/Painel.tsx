@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabase'
-import type { Comissao, Produto, Cliente, Estado } from '../types'
+import type { Comissao, Produto, Cliente, Estado, Destinatario, Papel } from '../types'
 import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl, nextMref } from '../utils'
 import { updateComissao, getOrCreateCliente } from '../data'
 import { IconClock, IconDownload, IconLock, IconSearch, IconWarn, IconEdit, IconTrash, IconCheck } from '../components/icons'
 
 const ESTADOS: Estado[] = ['pendente', 'parcial', 'paga']
+const PAPEL_LABEL: Record<Papel, string> = { leitura: 'Leitura', editar: 'Editar', submeter: 'Editar + Submeter' }
+const papelLink = (p: Papel) => (p === 'leitura' ? 'link só de leitura (/ver)' : 'link de edição (/validacao)')
 const estadoCls: Record<Estado, string> = {
   pendente: 'bg-gray-100 text-gray-700',
   parcial: 'bg-orange-100 text-orange-700',
@@ -24,35 +26,38 @@ export default function Painel() {
   const [sel, setSel] = useState<string>('')
   const [aberto, setAberto] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [link, setLink] = useState('')
-  const [tok, setTok] = useState('')
   const [envMsg, setEnvMsg] = useState('')
   const [editar, setEditar] = useState<Comissao | null>(null)
   const [hist, setHist] = useState<Comissao | null>(null)
-  const [copiadoP, setCopiadoP] = useState(false)
   const [q, setQ] = useState('')
   const [fEstado, setFEstado] = useState<'' | Estado>('')
   const [links, setLinks] = useState<Record<string, string>>({})
   const [def, setDef] = useState<{ gestor_nome?: string; diretor_email?: string } | null>(null)
   const [fechados, setFechados] = useState<string[]>([])
+  const [dests, setDests] = useState<Destinatario[]>([])
+  const [mostrarEnviar, setMostrarEnviar] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const [resultado, setResultado] = useState<any[] | null>(null)
 
   // silent = recarrega sem o ecrã "A carregar…" (mantém a posição de scroll ao adicionar linhas)
   async function carregar(silent = false) {
     if (!silent) setLoading(true)
     const { data: c } = await supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').order('data_adjudicacao')
     const nums = [...new Set((((c as any) || []) as any[]).map((x) => String(x.numero_projeto)))]
-    const [{ data: p }, { data: cl }, { data: lk }, { data: d }, { data: ev }] = await Promise.all([
+    const [{ data: p }, { data: cl }, { data: lk }, { data: d }, { data: ev }, { data: ds }] = await Promise.all([
       supabase.from('produtos').select('*').order('ordem'),
       supabase.from('clientes').select('*').order('nome'),
       supabase.from('projeto_links').select('numero_projeto,data_id').in('numero_projeto', nums.length ? nums : ['__none__']),
       supabase.from('definicoes').select('gestor_nome,diretor_email').eq('id', 1).single(),
       supabase.from('envios').select('mes_referencia,estado'),
+      supabase.from('destinatarios').select('*').eq('ativo', true).order('ordem'),
     ])
     setComissoes((c as any) || [])
     setProdutos((p as any) || [])
     setClientes((cl as any) || [])
     setLinks(Object.fromEntries(((lk as any) || []).map((x: any) => [x.numero_projeto, x.data_id])))
     setDef((d as any) || null)
+    setDests((ds as any) || [])
     setFechados([...new Set(((ev as any) || []).filter((e: any) => e.estado === 'concluido').map((e: any) => e.mes_referencia))] as string[])
     if (!silent) setLoading(false)
   }
@@ -75,8 +80,8 @@ export default function Painel() {
   const anos = Object.keys(porAno).map(Number).sort((a, b) => b - a)
 
   const idx = meses.indexOf(sel)
-  const irAnterior = () => { if (idx < meses.length - 1) { setSel(meses[idx + 1]); setLink('') } }
-  const irSeguinte = () => { if (idx > 0) { setSel(meses[idx - 1]); setLink('') } }
+  const irAnterior = () => { if (idx < meses.length - 1) { setSel(meses[idx + 1]); setResultado(null) } }
+  const irSeguinte = () => { if (idx > 0) { setSel(meses[idx - 1]); setResultado(null) } }
 
   const selOrder = sel ? parseMref(sel).order : 0
   // "aberta" = por pagar E não finalizada (finalizada = fechada manualmente, não transita)
@@ -106,7 +111,7 @@ export default function Painel() {
   }
 
   async function deleteLinha(c: Comissao) {
-    if (!confirm(`Apagar a linha ${c.numero_projeto} — ${c.cliente?.nome}?\nEsta ação não pode ser anulada.`)) return
+    if (!confirm(`Apagar a linha ${c.numero_projeto} - ${c.cliente?.nome}?\nEsta ação não pode ser anulada.`)) return
     const { error } = await supabase.from('comissoes').delete().eq('id', c.id)
     if (error) { alert('Erro: ' + error.message); return }
     await carregar()
@@ -122,7 +127,7 @@ export default function Painel() {
       return
     }
     const m = url.match(/data=(\d+)/)
-    if (!m) { alert('Link inválido — tem de conter "data=…".'); return }
+    if (!m) { alert('Link inválido - tem de conter "data=…".'); return }
     const { error } = await supabase.from('projeto_links').upsert({ numero_projeto: c.numero_projeto, data_id: m[1] }, { onConflict: 'numero_projeto' })
     if (error) { alert('Erro: ' + error.message); return }
     setLinks((prev) => ({ ...prev, [c.numero_projeto]: m[1] }))
@@ -132,24 +137,32 @@ export default function Painel() {
     await patch(c, { finalizada: !c.finalizada } as any)
   }
 
-  async function gerarLink() {
-    const ids = visiveis.filter((c) => emAberto(c)).map((c) => c.id)
-    const { data, error } = await supabase
-      .from('envios').insert({ mes_referencia: sel, comissao_ids: ids, total_comissoes: totComissao, enviado_por: def?.gestor_nome || 'Diogo Vale', enviado_para: def?.diretor_email || 'marco.arroz@hostpms.com' })
-      .select('token').single()
-    if (error) { alert('Erro: ' + error.message); return }
-    setTok(data.token)
+  // abre a janela de validação (não envia nada ainda)
+  function abrirEnviar() {
+    setResultado(null)
     setEnvMsg('')
-    setLink(`${window.location.origin}/validacao/${data.token}`)
+    setMostrarEnviar(true)
   }
 
-  async function enviarEmail() {
+  // confirma: cria o envio, envia a cada destinatário e mostra o resultado por pessoa
+  async function confirmarEnviar() {
+    if (dests.length === 0) { setEnvMsg('Sem destinatários ativos. Adiciona-os em Definições.'); return }
+    setEnviando(true)
     setEnvMsg('A enviar…')
     try {
-      const r = await fetch('/api/enviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: tok }) })
+      const ids = visiveis.filter((c) => emAberto(c)).map((c) => c.id)
+      const { data, error } = await supabase
+        .from('envios').insert({ mes_referencia: sel, comissao_ids: ids, total_comissoes: totComissao, enviado_por: def?.gestor_nome || 'Diogo Vale', enviado_para: dests.map((d) => d.email).join(', ') })
+        .select('token').single()
+      if (error) throw error
+      const r = await fetch('/api/enviar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: data.token }) })
       const out = await r.json()
-      setEnvMsg(r.ok ? `✓ Email enviado para ${out.to}${out.cc ? ` (CC só-leitura: ${out.cc})` : ''}` : `Erro: ${out.error}`)
-    } catch (e: any) { setEnvMsg('Erro: ' + e.message) }
+      if (!r.ok) { setEnvMsg(`Erro: ${out.error}`); setEnviando(false); return }
+      setResultado(out.enviados || [])
+      setEnvMsg('')
+      setMostrarEnviar(false)
+      await carregar(true)
+    } catch (e: any) { setEnvMsg('Erro: ' + e.message) } finally { setEnviando(false) }
   }
 
   if (loading) return <div className="text-gray-500">A carregar…</div>
@@ -163,7 +176,7 @@ export default function Painel() {
           {!aberto && selFechado && <span title="O diretor já reviu e concluiu este mês" className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 px-2 py-1"><IconLock className="w-3 h-3" /> concluído pelo diretor</span>}
         </div>
         {!aberto && (
-          <button onClick={gerarLink} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-5 py-2 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
+          <button onClick={abrirEnviar} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-5 py-2 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
             {selFechado ? 'Reenviar' : 'Enviar'}
           </button>
         )}
@@ -178,7 +191,7 @@ export default function Painel() {
         {!aberto && (
           <div className="flex items-center gap-1">
             <button onClick={irAnterior} disabled={idx >= meses.length - 1} className="px-2 py-2 rounded-lg border bg-white disabled:opacity-30">◀</button>
-            <select value={sel} onChange={(e) => { setSel(e.target.value); setLink('') }}
+            <select value={sel} onChange={(e) => { setSel(e.target.value); setResultado(null) }}
               className="px-3 py-2 rounded-lg border bg-white text-sm font-semibold text-host-navy min-w-[180px]">
               {anos.map((y) => (
                 <optgroup key={y} label={String(y)}>
@@ -216,15 +229,22 @@ export default function Painel() {
           ↪ <b>Novo ciclo de {mrefLabel(sel)}.</b> {transitadas.length} comissão(ões) transitada(s) de meses anteriores, por pagar. Adiciona novas vendas em baixo, se as houver.
         </div>
       )}
-      {link && (
-        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm flex items-center gap-3">
-          <span className="font-medium text-host-navy">Link para o Marco:</span>
-          <input readOnly value={link} className="flex-1 bg-white border rounded px-2 py-1 text-xs" onFocus={(e) => e.target.select()} />
-          <button onClick={() => { navigator.clipboard.writeText(link); setCopiadoP(true); setTimeout(() => setCopiadoP(false), 2000) }} className="text-host-blue font-semibold">{copiadoP ? '✓ Copiado!' : 'Copiar'}</button>
-          <button onClick={enviarEmail} className="bg-host-blue text-white font-semibold rounded px-3 py-1.5">Enviar email ao Marco</button>
-          {envMsg && <span className="text-xs text-gray-600">{envMsg}</span>}
+      {resultado && (
+        <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg text-sm">
+          <div className="font-semibold text-green-800 mb-2">✓ Mapa de {mrefLabel(sel)} enviado a {resultado.length} destinatário(s):</div>
+          <div className="space-y-1">
+            {resultado.map((r: any, i: number) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className={r.estado === 'enviado' ? 'text-green-700' : 'text-red-600'}>{r.estado === 'enviado' ? '✓' : '✕'}</span>
+                <span className="font-medium text-host-navy">{r.nome || r.email}</span>
+                <span className="text-gray-500">{r.email} · {PAPEL_LABEL[r.papel as Papel] || r.papel}</span>
+                {r.link && <button onClick={() => navigator.clipboard.writeText(r.link)} className="ml-auto text-host-blue font-semibold hover:underline">Copiar link</button>}
+              </div>
+            ))}
+          </div>
         </div>
       )}
+      {envMsg && !mostrarEnviar && <div className="mt-2 text-xs text-gray-600">{envMsg}</div>}
       </div>
 
       <div className="bg-white rounded-xl border mt-4 overflow-x-auto">
@@ -268,7 +288,7 @@ export default function Painel() {
                   <td className="px-2 py-1.5 text-right whitespace-nowrap">{eur(c.valor_venda)}</td>
                   <td className="px-2 py-1.5 text-right font-semibold whitespace-nowrap">{eur(c.comissao_calculada)}</td>
                   <td className="px-2 py-1.5 text-right text-gray-500" title="Preenchido pelo diretor">
-                    {c.valor_pago != null ? eur(c.valor_pago) : '—'}
+                    {c.valor_pago != null ? eur(c.valor_pago) : '-'}
                   </td>
                   <td className="px-2 py-1.5">
                     <span className={`inline-block w-full text-center rounded px-1 py-1 text-xs font-medium ${c.finalizada ? 'bg-gray-100 text-gray-400 line-through' : estadoCls[c.estado]}`}>{c.estado}</span>
@@ -276,11 +296,11 @@ export default function Painel() {
                   </td>
                   <td className="px-2 py-1.5">
                     <div className="flex items-center gap-1">
-                      <input defaultValue={c.observacoes ?? ''} placeholder="—" title={c.observacoes ?? ''}
+                      <input defaultValue={c.observacoes ?? ''} placeholder="-" title={c.observacoes ?? ''}
                         onBlur={(e) => { if (e.target.value !== (c.observacoes ?? '')) patch(c, { observacoes: e.target.value }) }}
                         className="flex-1 min-w-0 border rounded px-1 py-1" />
                       {c.estado !== 'paga' && (
-                        <button onClick={() => toggleFinalizada(c)} title={c.finalizada ? 'Reabrir — volta a transitar' : 'Finalizar — não transita (não se paga a diferença)'}
+                        <button onClick={() => toggleFinalizada(c)} title={c.finalizada ? 'Reabrir - volta a transitar' : 'Finalizar - não transita (não se paga a diferença)'}
                           className={`px-1 shrink-0 ${c.finalizada ? 'text-host-blue' : 'text-gray-300 hover:text-host-blue'}`}><IconCheck className="w-4 h-4" /></button>
                       )}
                       <button onClick={() => setHist(c)} title="Ver alterações" className="text-gray-400 hover:text-host-blue px-1 shrink-0"><IconClock className="w-4 h-4" /></button>
@@ -303,6 +323,54 @@ export default function Painel() {
 
       {editar && <EditarLinha comissao={editar} produtos={produtos} clientes={clientes} onClose={() => setEditar(null)} onSaved={carregar} />}
       {hist && <HistoricoLinha comissao={hist} onClose={() => setHist(null)} />}
+
+      {/* Janela de validação antes de enviar - mostra para quem vai e como */}
+      {mostrarEnviar && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !enviando && setMostrarEnviar(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-5 max-h-[85vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-host-navy mb-1">Enviar mapa de {mrefLabel(sel)}</h3>
+            <p className="text-sm text-gray-500 mb-4">Confirma para quem vai e com que acesso antes de enviar.</p>
+
+            <div className="bg-gray-50 rounded-lg p-3 mb-4 text-sm flex flex-wrap gap-x-6 gap-y-1">
+              <span className="text-gray-500">Linhas em aberto: <b className="text-host-navy">{visiveis.filter(emAberto).length}</b></span>
+              <span className="text-gray-500">Total comissões: <b className="text-host-navy">{eur(porPagar)}</b></span>
+            </div>
+
+            {dests.length === 0 ? (
+              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-700">
+                Não há destinatários ativos. Adiciona-os em <b>Definições → Destinatários das comissões</b>.
+              </div>
+            ) : (
+              <div className="space-y-2 mb-4">
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Destinatários ({dests.length})</div>
+                {dests.map((d) => (
+                  <div key={d.id} className="flex items-center gap-3 border rounded-lg px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="font-medium text-host-navy truncate">{d.nome || d.email}</div>
+                      <div className="text-xs text-gray-500 truncate">{d.email}</div>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <div className="text-xs font-semibold text-host-blue">{PAPEL_LABEL[d.papel]}</div>
+                      <div className="text-[10px] text-gray-400">{papelLink(d.papel)}</div>
+                    </div>
+                  </div>
+                ))}
+                <p className="text-[11px] text-gray-400">Cada pessoa recebe um email com um link individual. Podes acompanhar quem abre, edita e submete (em privado).</p>
+              </div>
+            )}
+
+            {envMsg && <div className="text-xs text-red-600 mb-2">{envMsg}</div>}
+
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setMostrarEnviar(false)} disabled={enviando} className="px-4 py-2 rounded-lg border text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+              <button onClick={confirmarEnviar} disabled={enviando || dests.length === 0}
+                className="px-5 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold shadow-glow hover:bg-host-bluedark disabled:opacity-50">
+                {enviando ? 'A enviar…' : `Confirmar e enviar a ${dests.length}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -324,13 +392,13 @@ function HistoricoLinha({ comissao, onClose }: { comissao: Comissao; onClose: ()
   }, [comissao.id])
 
   const fmt = (iso: string) => new Date(iso).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  const val = (s: string | null) => (s == null || s === '' ? '—' : s)
+  const val = (s: string | null) => (s == null || s === '' ? '-' : s)
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-xl p-5 max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-host-navy mb-1">Histórico de alterações</h3>
-        <p className="text-sm text-gray-500 mb-4">{comissao.numero_projeto} — {comissao.cliente?.nome}</p>
+        <p className="text-sm text-gray-500 mb-4">{comissao.numero_projeto} - {comissao.cliente?.nome}</p>
         {loading ? <p className="text-gray-400">A carregar…</p>
           : linhas.length === 0 ? <p className="text-gray-400 text-sm">Sem alterações registadas.</p>
           : (
@@ -418,7 +486,7 @@ function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comis
             </select>
           </label>
           <label className="col-span-2">Observações<input value={obs} onChange={(e) => setObs(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
-          <label className="col-span-2">Link da plataforma (cola o URL — o nº fica clicável)
+          <label className="col-span-2">Link da plataforma (cola o URL - o nº fica clicável)
             <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://platform.hostpms.com/?cmd=project&data=…" className="mt-1 w-full border rounded px-2 py-1.5" />
           </label>
         </div>

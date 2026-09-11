@@ -55,8 +55,8 @@ export function emAberto(estado: string): boolean {
 // Marcadores: {bonus} = valor do bónus · {aPagar} = total a pagar do mês.
 export const MSG_DIR = {
   confirma: 'Marco… zero bónus para o Diogo este mês?\n\nEle andou a fechar negócios como uma máquina e nem um cafezinho?\nO Diogo MERECE e tu sabes disso.\n\nDe certeza que queres submeter as comissões assim, sem nenhum bónus?',
-  bonus: 'Boom! O Diogo vai abrir este email e sorrir de orelha a orelha. Obrigado por seres generoso e reconheceres o desempenho de alto nível dele — {bonus} de bónus registados!',
-  semBonus: 'Revisto submetido ao Diogo — a pagar {aPagar}. (Fica para o próximo o bónus, certo?)',
+  bonus: 'Boom! O Diogo vai abrir este email e sorrir de orelha a orelha. Obrigado por seres generoso e reconheceres o desempenho de alto nível dele - {bonus} de bónus registados!',
+  semBonus: 'Revisto submetido ao Diogo - a pagar {aPagar}. (Fica para o próximo o bónus, certo?)',
 }
 
 // Link para o projeto na plataforma HostPMS (data id interno).

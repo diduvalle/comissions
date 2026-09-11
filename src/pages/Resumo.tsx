@@ -3,8 +3,8 @@ import { supabase } from '../supabase'
 import type { Comissao, Envio } from '../types'
 import { eur, parseMref, MESES } from '../utils'
 
-const COR_REC = '#0667FF' // recorrente (SaaS) — azul Host
-const COR_PON = '#cbd5e1' // pontual (Setup/Serviços) — cinza claro
+const COR_REC = '#0667FF' // recorrente (SaaS) - azul Host
+const COR_PON = '#cbd5e1' // pontual (Setup/Serviços) - cinza claro
 
 function pctTxt(n: number) { return `${n > 0 ? '+' : ''}${n.toFixed(0)}%` }
 
@@ -87,13 +87,13 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
 
   // mix por produto
   const porProduto: Record<string, number> = {}
-  doAno.forEach((c) => { const t = c.produto?.tipo || '—'; porProduto[t] = (porProduto[t] || 0) + Number(c.comissao_calculada || 0) })
+  doAno.forEach((c) => { const t = c.produto?.tipo || '-'; porProduto[t] = (porProduto[t] || 0) + Number(c.comissao_calculada || 0) })
   const produtos = Object.entries(porProduto).map(([tipo, v]) => ({ tipo, v })).sort((a, b) => b.v - a.v)
   const maxProd = Math.max(1, ...produtos.map((p) => p.v))
 
   // clientes
   const porCliente: Record<string, { nome: string; v: number; n: number }> = {}
-  doAno.forEach((c) => { const nome = c.cliente?.nome || '—'; porCliente[nome] ||= { nome, v: 0, n: 0 }; porCliente[nome].v += Number(c.comissao_calculada || 0); porCliente[nome].n += 1 })
+  doAno.forEach((c) => { const nome = c.cliente?.nome || '-'; porCliente[nome] ||= { nome, v: 0, n: 0 }; porCliente[nome].v += Number(c.comissao_calculada || 0); porCliente[nome].n += 1 })
   const clientes = Object.values(porCliente).sort((a, b) => b.v - a.v)
   const top5 = clientes.slice(0, 5)
   const conc = totComissao > 0 ? (top5.reduce((s, c) => s + c.v, 0) / totComissao) * 100 : 0
@@ -115,7 +115,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
 
   // insights automáticos
   const insights: string[] = []
-  if (yoy != null) insights.push(`Comissão de ${ano}: ${eur(totComissao)} — ${pctTxt(yoy)} vs ${ano - 1}.`)
+  if (yoy != null) insights.push(`Comissão de ${ano}: ${eur(totComissao)} - ${pctTxt(yoy)} vs ${ano - 1}.`)
   if (totComissao > 0) insights.push(`${recPct.toFixed(0)}% da tua comissão vem de produtos recorrentes (SaaS).`)
   if (top5.length) insights.push(`Os teus ${top5.length} maiores clientes valem ${conc.toFixed(0)}% do total${clientes[0] ? ` (líder: ${clientes[0].nome}).` : '.'}`)
   if (melhorIdx >= 0 && porMes[melhorIdx] > 0) insights.push(`Melhor mês: ${MESES[melhorIdx]} com ${eur(porMes[melhorIdx])}.`)
@@ -152,7 +152,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
   const taxaAbertura = enviosAno.length ? (abertos.length / enviosAno.length) * 100 : 0
   const tempos = abertos.map((e) => (new Date(e.aberto_em as string).getTime() - new Date(e.data_envio).getTime()) / 3600000).filter((h) => h >= 0)
   const tempoMedioH = tempos.length ? tempos.reduce((s, h) => s + h, 0) / tempos.length : null
-  const tempoTxt = tempoMedioH == null ? '—' : tempoMedioH < 48 ? `${Math.round(tempoMedioH)}h` : `${(tempoMedioH / 24).toFixed(1)} dias`
+  const tempoTxt = tempoMedioH == null ? '-' : tempoMedioH < 48 ? `${Math.round(tempoMedioH)}h` : `${(tempoMedioH / 24).toFixed(1)} dias`
 
   // média móvel de 3 meses (linha de tendência)
   const ma = porMes.map((_, i) => { const w = porMes.slice(Math.max(0, i - 2), i + 1); return w.reduce((s, x) => s + x, 0) / w.length })
@@ -224,7 +224,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
         </div>
       </div>
 
-      {/* Recorrente vs Pontual — barra de proporção */}
+      {/* Recorrente vs Pontual - barra de proporção */}
       <div className="bg-white rounded-xl border p-4 mb-3">
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-semibold text-host-navy">Recorrente vs Pontual</h3>
@@ -317,7 +317,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
       <div className="bg-white rounded-xl border p-4 mb-3">
         <h3 className="font-semibold text-host-navy mb-3">Comissão por marca</h3>
         {marcas.length === 0 ? (
-          <p className="text-sm text-gray-400">Sem marca atribuída aos projetos ainda — é preenchida pela recolha de valores da plataforma.</p>
+          <p className="text-sm text-gray-400">Sem marca atribuída aos projetos ainda - é preenchida pela recolha de valores da plataforma.</p>
         ) : (
           <div className="space-y-2">
             {marcas.map((m) => (
@@ -363,7 +363,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
       {/* Sazonalidade (heatmap mês × ano) */}
       {heat.length > 0 && (
         <div className="bg-white rounded-xl border p-4 mt-3">
-          <h3 className="font-semibold text-host-navy mb-3">Sazonalidade — comissão por mês × ano</h3>
+          <h3 className="font-semibold text-host-navy mb-3">Sazonalidade - comissão por mês × ano</h3>
           <div className="overflow-x-auto">
             <div className="min-w-[560px]">
               <div className="flex text-[10px] text-gray-400 mb-1"><div className="w-10" />{MESES.map((m) => <div key={m} className="flex-1 text-center">{m.slice(0, 3)}</div>)}</div>

@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     const frase = evento === 'abriu'
       ? `<b>${quem}</b> acabou de <b>abrir</b> o mapa de <b>${mes}</b>.`
       : `<b>${quem}</b> <b>começou a editar</b> o mapa de <b>${mes}</b>.`
-    const subject = evento === 'abriu' ? `${emoji} ${ed.nome || ed.email} abriu — ${mes}` : `${emoji} ${ed.nome || ed.email} está a editar — ${mes}`
+    const subject = evento === 'abriu' ? `${emoji} ${ed.nome || ed.email} abriu - ${mes}` : `${emoji} ${ed.nome || ed.email} está a editar - ${mes}`
     const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0F1E2E;font-size:14px"><p>${emoji} ${frase}</p><p style="color:#9aa4b2;font-size:12px;margin-top:24px">Host Hotel Systems · Move beyond expectations.</p></div>`
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST', headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },

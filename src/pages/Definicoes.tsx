@@ -127,7 +127,7 @@ export default function Definicoes() {
               <button onClick={() => removeDest(d.id)} className="text-gray-400 hover:text-red-600 text-sm px-1" title="Remover">✕</button>
             </div>
           ))}
-          {dests.length === 0 && <p className="text-sm text-gray-400">Ainda sem destinatários — adiciona abaixo.</p>}
+          {dests.length === 0 && <p className="text-sm text-gray-400">Ainda sem destinatários - adiciona abaixo.</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t">
           <input value={novoDest.nome} onChange={(e) => setNovoDest({ ...novoDest, nome: e.target.value })} placeholder="Nome" className="w-40 border rounded px-2 py-1.5 text-sm" />
@@ -205,17 +205,17 @@ export default function Definicoes() {
         </p>
         <div className="space-y-4 text-sm">
           <label className="block">
-            <span className="font-medium text-host-navy">1. Antes de submeter — se NÃO houver bónus</span>
+            <span className="font-medium text-host-navy">1. Antes de submeter - se NÃO houver bónus</span>
             <span className="block text-xs text-gray-400 mb-1">Aviso (pop-up) que aparece ao clicar "Revisto" sem ter posto bónus. Tem de confirmar para enviar.</span>
             <textarea value={def.msg_dir_confirma ?? MSG_DIR.confirma} onChange={(e) => set('msg_dir_confirma', e.target.value)} rows={4} className="w-full border rounded px-2 py-1.5" />
           </label>
           <label className="block">
-            <span className="font-medium text-host-navy">2. Depois de submeter — COM bónus</span>
+            <span className="font-medium text-host-navy">2. Depois de submeter - COM bónus</span>
             <span className="block text-xs text-gray-400 mb-1">Mensagem de agradecimento que aparece após enviar, quando há bónus.</span>
             <textarea value={def.msg_dir_bonus ?? MSG_DIR.bonus} onChange={(e) => set('msg_dir_bonus', e.target.value)} rows={3} className="w-full border rounded px-2 py-1.5" />
           </label>
           <label className="block">
-            <span className="font-medium text-host-navy">3. Depois de submeter — SEM bónus</span>
+            <span className="font-medium text-host-navy">3. Depois de submeter - SEM bónus</span>
             <span className="block text-xs text-gray-400 mb-1">Mensagem que aparece após enviar, quando não há bónus.</span>
             <textarea value={def.msg_dir_sem_bonus ?? MSG_DIR.semBonus} onChange={(e) => set('msg_dir_sem_bonus', e.target.value)} rows={2} className="w-full border rounded px-2 py-1.5" />
           </label>
@@ -241,7 +241,7 @@ export default function Definicoes() {
       {/* Atualizar valores da plataforma */}
       <Section title="Atualizar valores da plataforma (auto-preenchimento)">
         <p className="text-sm text-gray-500 mb-3">
-          Os valores (Setup/SaaS) que pré-preenchem as novas linhas vêm da plataforma HostPMS. Como a plataforma exige a <b>tua sessão autenticada</b>, a atualização parte sempre de ti — mas fica a <b>1 clique</b> com o atalho abaixo.
+          Os valores (Setup/SaaS) que pré-preenchem as novas linhas vêm da plataforma HostPMS. Como a plataforma exige a <b>tua sessão autenticada</b>, a atualização parte sempre de ti - mas fica a <b>1 clique</b> com o atalho abaixo.
         </p>
         <div className="text-sm text-host-navy font-semibold mb-1">Configurar (só 1 vez)</div>
         <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1 mb-3">
@@ -259,9 +259,9 @@ export default function Definicoes() {
         <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1">
           <li>Entra na plataforma e abre <b>Comercial → Propostas</b> (com o teu nome em Rep. Vendas, período largo).</li>
           <li>Clica nos separadores das marcas (Host, CLEVER, hey!, Profile) para carregarem.</li>
-          <li>Clica no favorito <b>Atualizar valores</b>. Aparece <i>"OK! N valores e N links atualizados"</i> — valores, links e marca de uma só vez.</li>
+          <li>Clica no favorito <b>Atualizar valores</b>. Aparece <i>"OK! N valores e N links atualizados"</i> - valores, links e marca de uma só vez.</li>
         </ol>
-        <p className="text-xs text-gray-400 mt-2">Se o navegador bloquear o envio direto, o atalho copia os valores para a área de transferência — basta colares no chat comigo com a palavra "atualiza".</p>
+        <p className="text-xs text-gray-400 mt-2">Se o navegador bloquear o envio direto, o atalho copia os valores para a área de transferência - basta colares no chat comigo com a palavra "atualiza".</p>
       </Section>
 
       {/* Identificação & acesso */}
