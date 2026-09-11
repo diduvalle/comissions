@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Comissao, Produto, Cliente, Estado } from '../types'
 import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl, nextMref } from '../utils'
@@ -36,8 +36,9 @@ export default function Painel() {
   const [def, setDef] = useState<{ gestor_nome?: string; diretor_email?: string } | null>(null)
   const [fechados, setFechados] = useState<string[]>([])
 
-  async function carregar() {
-    setLoading(true)
+  // silent = recarrega sem o ecrã "A carregar…" (mantém a posição de scroll ao adicionar linhas)
+  async function carregar(silent = false) {
+    if (!silent) setLoading(true)
     const { data: c } = await supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').order('data_adjudicacao')
     const nums = [...new Set((((c as any) || []) as any[]).map((x) => String(x.numero_projeto)))]
     const [{ data: p }, { data: cl }, { data: lk }, { data: d }, { data: ev }] = await Promise.all([
@@ -53,7 +54,7 @@ export default function Painel() {
     setLinks(Object.fromEntries(((lk as any) || []).map((x: any) => [x.numero_projeto, x.data_id])))
     setDef((d as any) || null)
     setFechados([...new Set(((ev as any) || []).filter((e: any) => e.estado === 'concluido').map((e: any) => e.mes_referencia))] as string[])
-    setLoading(false)
+    if (!silent) setLoading(false)
   }
   useEffect(() => { carregar() }, [])
 
@@ -293,7 +294,7 @@ export default function Painel() {
           </tbody>
           {!aberto && (
             <tfoot>
-              <NovaLinha produtos={produtos} clientes={clientes} mes={sel} onAdd={carregar} />
+              <NovaLinha produtos={produtos} clientes={clientes} mes={sel} onAdd={() => carregar(true)} />
             </tfoot>
           )}
         </table>
@@ -444,6 +445,7 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
   const [obs, setObs] = useState('')
   const [busy, setBusy] = useState(false)
   const [platVal, setPlatVal] = useState<any>(null)
+  const nroRef = useRef<HTMLInputElement>(null)
 
   // procura os valores da plataforma para o nº de projeto (tabela projeto_valores)
   async function buscarPlat(n: string) {
@@ -491,13 +493,16 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
       if (error) throw error
       setNro(''); setCliente(''); setProdId(''); setIsSaas(false); setMensal(''); setValor(''); setObs(''); setPlatVal(null)
       onAdd()
+      // mantém o foco no Nº e a linha à vista, para adicionar a seguinte sem descer
+      nroRef.current?.focus()
+      nroRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
     } catch (e: any) { alert('Erro: ' + e.message) } finally { setBusy(false) }
   }
 
   return (
     <tr className="border-t-2 border-host-blue/30 bg-blue-50/40">
       <td className="px-2 py-1.5 align-top">
-        <input value={nro} onChange={(e) => setNro(e.target.value)} onBlur={(e) => buscarPlat(e.target.value.trim())} placeholder="Nº" className="w-full border rounded px-1 py-1" />
+        <input ref={nroRef} value={nro} onChange={(e) => setNro(e.target.value)} onBlur={(e) => buscarPlat(e.target.value.trim())} placeholder="Nº" className="w-full border rounded px-1 py-1" />
         {platVal && (Number(platVal.setup) > 0 || Number(platVal.saas_mes) > 0) && (
           <div className="mt-1 text-[10px] leading-tight text-host-blue">
             <span className="inline-flex items-center gap-0.5"><IconDownload className="w-3 h-3" /> plataforma:</span>
