@@ -294,7 +294,7 @@ export default function Painel() {
           </tbody>
           {!aberto && (
             <tfoot>
-              <NovaLinha produtos={produtos} clientes={clientes} mes={sel} onAdd={() => carregar(true)} />
+              <NovaLinha produtos={produtos} clientes={clientes} mes={sel} existentes={comissoes} onAdd={() => carregar(true)} />
             </tfoot>
           )}
         </table>
@@ -434,7 +434,7 @@ function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comis
   )
 }
 
-function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; clientes: Cliente[]; mes: string; onAdd: () => void }) {
+function NovaLinha({ produtos, clientes, mes, existentes, onAdd }: { produtos: Produto[]; clientes: Cliente[]; mes: string; existentes: Comissao[]; onAdd: () => void }) {
   const [nro, setNro] = useState('')
   const [data, setData] = useState(hojeISO())
   const [cliente, setCliente] = useState('')
@@ -450,9 +450,15 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
   // procura os valores da plataforma para o nº de projeto (tabela projeto_valores)
   async function buscarPlat(n: string) {
     if (!n) { setPlatVal(null); return }
-    const { data } = await supabase.from('projeto_valores').select('*').eq('numero_projeto', n).maybeSingle()
-    setPlatVal(data || null)
+    const { data: pv } = await supabase.from('projeto_valores').select('*').eq('numero_projeto', n).maybeSingle()
+    setPlatVal(pv || null)
+    // usa a data de início da plataforma (se existir), em vez da data de hoje
+    if (pv?.data_inicio) setData(pv.data_inicio)
   }
+
+  // já existe este nº de projeto no mapa? (aviso de duplicado ao escrever)
+  const nroTrim = nro.trim()
+  const jaExiste = nroTrim ? existentes.filter((c) => String(c.numero_projeto) === nroTrim) : []
   function usarSetup() {
     const p = produtos.find((x) => /setup/i.test(x.tipo))
     if (p) setProdId(p.id)
@@ -502,7 +508,14 @@ function NovaLinha({ produtos, clientes, mes, onAdd }: { produtos: Produto[]; cl
   return (
     <tr className="border-t-2 border-host-blue/30 bg-blue-50/40">
       <td className="px-2 py-1.5 align-top">
-        <input ref={nroRef} value={nro} onChange={(e) => setNro(e.target.value)} onBlur={(e) => buscarPlat(e.target.value.trim())} placeholder="Nº" className="w-full border rounded px-1 py-1" />
+        <input ref={nroRef} value={nro} onChange={(e) => setNro(e.target.value)} onBlur={(e) => buscarPlat(e.target.value.trim())} placeholder="Nº"
+          className={`w-full border rounded px-1 py-1 ${jaExiste.length ? 'border-orange-400 bg-orange-50' : ''}`} />
+        {jaExiste.length > 0 && (
+          <div className="mt-1 text-[10px] leading-tight text-orange-600 font-semibold">
+            <span className="inline-flex items-center gap-0.5"><IconWarn className="w-3 h-3" /> já na lista ({jaExiste.length}):</span>
+            <span className="block font-normal">{jaExiste.slice(0, 3).map((c) => `${mrefLabel(c.mes_referencia)} · ${c.produto?.tipo || ''}`).join('; ')}{jaExiste.length > 3 ? '…' : ''}</span>
+          </div>
+        )}
         {platVal && (Number(platVal.setup) > 0 || Number(platVal.saas_mes) > 0) && (
           <div className="mt-1 text-[10px] leading-tight text-host-blue">
             <span className="inline-flex items-center gap-0.5"><IconDownload className="w-3 h-3" /> plataforma:</span>
