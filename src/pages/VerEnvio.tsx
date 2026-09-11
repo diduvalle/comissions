@@ -24,15 +24,30 @@ export default function VerEnvio() {
 
   useEffect(() => {
     (async () => {
-      const { data: e } = await supabase.from('envios').select('*').eq('token', token).maybeSingle()
+      // resolve o token: individual (envio_destinatarios) ou antigo (envios)
+      const { data: edRow } = await supabase.from('envio_destinatarios').select('*').eq('token', token).maybeSingle()
+      let e: any = null
+      if (edRow) {
+        const { data: ev } = await supabase.from('envios').select('*').eq('id', (edRow as any).envio_id).maybeSingle()
+        e = ev
+      } else {
+        const { data: ev } = await supabase.from('envios').select('*').eq('token', token).maybeSingle()
+        e = ev
+      }
       if (!e) { setErro('Link inválido ou expirado.'); setLoading(false); return }
       setEnvio(e as any)
-      // avisa o gestor quando a contabilidade abre (1ª vez), distinto do diretor
-      if (!registado.current && !(e as any).cc_aberto_em) {
+      // rastreio da abertura (1ª vez) — avisa o gestor, sem o destinatário saber
+      if (!registado.current) {
         registado.current = true
-        // await obrigatório: sem ele o supabase-js nunca envia o pedido
-        await supabase.from('envios').update({ cc_aberto_em: new Date().toISOString() }).eq('id', (e as any).id)
-        fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'cc' }) }).catch(() => {})
+        if (edRow) {
+          const primeira = !(edRow as any).aberto_em
+          // await obrigatório: sem ele o supabase-js nunca envia o pedido
+          await supabase.from('envio_destinatarios').update({ aberto_em: (edRow as any).aberto_em || new Date().toISOString(), aberto_contagem: ((edRow as any).aberto_contagem || 0) + 1 }).eq('id', (edRow as any).id)
+          if (primeira) fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, evento: 'abriu' }) }).catch(() => {})
+        } else if (!(e as any).cc_aberto_em) {
+          await supabase.from('envios').update({ cc_aberto_em: new Date().toISOString() }).eq('id', (e as any).id)
+          fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'cc' }) }).catch(() => {})
+        }
       }
       const [{ data: d }, { data: c }] = await Promise.all([
         supabase.from('definicoes').select('*').eq('id', 1).single(),

@@ -15,6 +15,7 @@ export default async function handler(req, res) {
   if (!RESEND) return res.status(500).json({ error: 'RESEND_API_KEY em falta' })
   const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {})
   const token = body.token
+  const por = (body.por && String(body.por).trim()) || 'O destinatário'
   if (!token) return res.status(400).json({ error: 'token em falta' })
   const h = { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` }
   try {
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
 
     const html = `<div style="font-family:Inter,Arial,sans-serif;color:#0F1E2E;font-size:14px">
       <h2 style="color:#0F1E2E">Mapa revisto — ${mrefLabel(envio.mes_referencia)}</h2>
-      <p>O Marco Arroz reviu as comissões. Ponto de situação:</p>
+      <p>${por} reviu as comissões. Ponto de situação:</p>
       <table style="border-collapse:collapse;width:100%;font-size:13px">
         <thead><tr style="text-align:left;color:#667">
           <th style="padding:6px 8px">Nº</th><th style="padding:6px 8px">Cliente</th><th style="padding:6px 8px">Produto</th>
@@ -61,7 +62,7 @@ export default async function handler(req, res) {
     const r = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL], reply_to: 'marco.arroz@hostpms.com', subject: `✓ Revisto — ${mrefLabel(envio.mes_referencia)} — a pagar ${eur(aPagar)}`, html }),
+      body: JSON.stringify({ from: 'Comissões <diogo.vale@cr0x.org>', to: [GESTOR_EMAIL], subject: `✓ Revisto — ${mrefLabel(envio.mes_referencia)} — a pagar ${eur(aPagar)}`, html }),
     })
     const out = await r.json()
     await logEmail({ tipo: 'revisto', para: GESTOR_EMAIL, assunto: `✓ Revisto — ${mrefLabel(envio.mes_referencia)} — a pagar ${eur(aPagar)}`, corpo: html, envio_id: String(envio.id), resend_id: out?.id, estado: r.ok ? 'enviado' : 'erro', erro: r.ok ? null : JSON.stringify(out) })

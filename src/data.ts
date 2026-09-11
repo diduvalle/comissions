@@ -7,7 +7,7 @@ const TRACK: (keyof Comissao)[] = ['valor_pago', 'comissao_calculada', 'percenta
 export async function updateComissao(
   atual: Comissao,
   patch: Partial<Comissao>,
-  por: 'gestor' | 'diretor',
+  por: string,
 ) {
   const { error } = await supabase.from('comissoes').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', atual.id)
   if (error) throw error

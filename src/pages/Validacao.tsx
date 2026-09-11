@@ -43,21 +43,41 @@ export default function Validacao() {
   const [toast, setToast] = useState('')
   const flash = (msg = '✓ Guardado') => { setToast(msg); setTimeout(() => setToast(''), 1800) }
   const [links, setLinks] = useState<Record<string, string>>({})
+  const [ed, setEd] = useState<any>(null)   // linha envio_destinatarios (token individual)
+  const [papel, setPapel] = useState<'leitura' | 'editar' | 'submeter'>('submeter')
+  const [nomeAtor, setNomeAtor] = useState('diretor')
   const registado = useRef(false)
+  const edicaoRef = useRef(false)
 
   async function carregar() {
     setLoading(true)
-    const { data: e } = await supabase.from('envios').select('*').eq('token', token).maybeSingle()
+    // resolve o token: individual (envio_destinatarios) ou antigo (envios)
+    const { data: edRow } = await supabase.from('envio_destinatarios').select('*').eq('token', token).maybeSingle()
+    let e: any = null
+    if (edRow) {
+      setEd(edRow); setPapel((edRow as any).papel || 'submeter'); setNomeAtor((edRow as any).nome || 'destinatário')
+      const { data: ev } = await supabase.from('envios').select('*').eq('id', (edRow as any).envio_id).maybeSingle()
+      e = ev
+    } else {
+      const { data: ev } = await supabase.from('envios').select('*').eq('token', token).maybeSingle()
+      e = ev; setPapel('submeter'); setNomeAtor('diretor')
+    }
     if (!e) { setErro('Link inválido ou expirado.'); setLoading(false); return }
     setEnvio(e as any)
     setBonus(Number((e as any).bonus || 0))
     setBonusNota((e as any).bonus_descricao || '')
     if (!registado.current) {
       registado.current = true
-      const primeiraVez = !(e as any).aberto_em
-      // IMPORTANTE: tem de ser await — os builders do supabase-js só executam quando aguardados
-      await supabase.from('envios').update({ aberto_em: (e as any).aberto_em || new Date().toISOString(), aberto_contagem: ((e as any).aberto_contagem || 0) + 1 }).eq('id', (e as any).id)
-      if (primeiraVez) fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'diretor' }) }).catch(() => {})
+      if (edRow) {
+        const primeira = !(edRow as any).aberto_em
+        await supabase.from('envio_destinatarios').update({ aberto_em: (edRow as any).aberto_em || new Date().toISOString(), aberto_contagem: ((edRow as any).aberto_contagem || 0) + 1 }).eq('id', (edRow as any).id)
+        if (primeira) fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, evento: 'abriu' }) }).catch(() => {})
+        if ((edRow as any).primeira_edicao_em) edicaoRef.current = true
+      } else {
+        const primeiraVez = !(e as any).aberto_em
+        await supabase.from('envios').update({ aberto_em: (e as any).aberto_em || new Date().toISOString(), aberto_contagem: ((e as any).aberto_contagem || 0) + 1 }).eq('id', (e as any).id)
+        if (primeiraVez) fetch('/api/abriu', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, who: 'diretor' }) }).catch(() => {})
+      }
     }
     const [{ data: d }, { data: c }] = await Promise.all([
       supabase.from('definicoes').select('*').eq('id', 1).single(),
@@ -72,10 +92,19 @@ export default function Validacao() {
   }
   useEffect(() => { carregar() }, [token])
 
+  // Na 1ª edição, marca no registo do destinatário e avisa o gestor (privado).
+  async function marcarEdicao() {
+    if (papel === 'leitura' || edicaoRef.current || !ed) return
+    edicaoRef.current = true
+    await supabase.from('envio_destinatarios').update({ primeira_edicao_em: new Date().toISOString() }).eq('id', ed.id)
+    fetch('/api/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, evento: 'editou' }) }).catch(() => {})
+  }
+
   async function patch(c: Comissao, p: Partial<Comissao>) {
     // atualização otimista (sem reload da página) — fluxo ágil
     setLinhas((prev) => prev.map((x) => (x.id === c.id ? { ...x, ...p } : x)))
-    try { await updateComissao(c, p, 'diretor'); flash() } catch (e: any) { alert('Erro: ' + e.message); carregar() }
+    marcarEdicao()
+    try { await updateComissao(c, p, nomeAtor); flash() } catch (e: any) { alert('Erro: ' + e.message); carregar() }
   }
 
   // O diretor pode ajustar a % — recalcula a comissão e reavalia o estado. Fica no histórico.
@@ -106,6 +135,7 @@ export default function Validacao() {
 
   async function guardarBonus(valor: number, nota: string) {
     if (!envio) return
+    marcarEdicao()
     await supabase.from('envios').update({ bonus: valor, bonus_descricao: nota }).eq('id', envio.id)
     flash()
   }
@@ -127,9 +157,10 @@ export default function Validacao() {
     }
     setRevMsg('A submeter…')
     try {
-      const r = await fetch('/api/revisto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+      const r = await fetch('/api/revisto', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: (envio as any)?.token, por: nomeAtor }) })
       const out = await r.json()
       if (!r.ok) { setRevMsg(`Erro: ${out.error}`); return }
+      if (ed) await supabase.from('envio_destinatarios').update({ submetido_em: new Date().toISOString() }).eq('id', ed.id)
       // mensagem final (editável nas Definições) — com/sem bónus
       setRevMsg(temBonus
         ? (def?.msg_dir_bonus || MSG_DIR.bonus).replace('{bonus}', eur(bonus))
@@ -138,9 +169,10 @@ export default function Validacao() {
   }
 
   async function marcarTodasPagas() {
+    marcarEdicao()
     for (const c of linhas) {
       if (c.estado !== 'paga') {
-        await updateComissao(c, { estado: 'paga', valor_pago: devido(c) }, 'diretor')
+        await updateComissao(c, { estado: 'paga', valor_pago: devido(c) }, nomeAtor)
       }
     }
     await carregar()
@@ -376,6 +408,7 @@ export default function Validacao() {
           </div>
         </div>
 
+        {papel === 'submeter' ? (
         <div className="mt-6 flex flex-col items-center gap-2">
           <button onClick={enviarRevisto} className="bg-gradient-to-r from-green-600 to-emerald-500 text-white font-semibold rounded-xl px-7 py-3.5 shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">
             ✓ Revisto — submeter ao Diogo
@@ -383,6 +416,9 @@ export default function Validacao() {
           {revMsg && <span className="text-sm text-gray-600">{revMsg}</span>}
           <span className="text-xs text-gray-400">Envia ao Diogo o ponto de situação e o total a pagar deste mês.</span>
         </div>
+        ) : (
+        <div className="mt-6 text-center text-xs text-gray-400">As alterações ficam guardadas automaticamente.</div>
+        )}
         </>)}
 
         <p className="text-center text-xs text-gray-400 mt-6 italic">Move beyond expectations.</p>
