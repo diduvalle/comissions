@@ -9,7 +9,9 @@ const dData = (d: Date) => d.toLocaleDateString('pt-PT', { day: '2-digit', month
 const maisDias = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d }
 
 // Atalho (bookmarklet): em Comercial > Propostas, recolhe valores + links + marca num clique.
-const BOOKMARKLET = `javascript:(async()=>{try{var EXT={0:'Host',1:'Hstays',2:'Clever',3:'hey!',5:'ProfileNow'};var toISO=function(v){if(!v)return null;var dt=(v instanceof Date)?v:new Date(v);if(isNaN(dt.getTime()))return null;var y=dt.getFullYear();if(y<2015||y>2100)return null;return y+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')};var pickDate=function(d){var ks=Object.keys(d);var tiers=[/^(datainicio|startdate|datastart|inicio|start|data|date)$/i,/inicio|start/i,/date|data/i];for(var t=0;t<tiers.length;t++){for(var i=0;i<ks.length;i++){if(tiers[t].test(ks[i])){var iso=toISO(d[ks[i]]);if(iso)return iso}}}return null};var S={},V=[],L=[];Ext.ComponentQuery.query('grid').forEach(function(g){var s=g.getStore&&g.getStore();if(s&&s.getCount&&s.getCount()>0&&s.getAt(0).data.hasOwnProperty('Nr')&&s.getAt(0).data.hasOwnProperty('TotalSum')&&s.getAt(0).data.hasOwnProperty('ProjectId')){s.each(function(r){var d=r.data;if(d.Deleted)return;var nr=String(d.Nr);if(!nr||S[nr])return;S[nr]=1;V.push({numero_projeto:nr,cliente:d.ProfileName||null,setup:Math.round(Number(d.TotalSum||0)*100)/100,saas_mes:Math.round(Number(d.SaaSSum||0)*100)/100,marca:EXT[d.ExtType]||'Outro',data_inicio:pickDate(d)});if(d.ProjectId>0)L.push({numero_projeto:nr,data_id:String(d.ProjectId)})})}});if(!V.length){alert('Abre Comercial > Propostas e os separadores das marcas primeiro.');return}var SB='https://bhurcadussdjohbngekq.supabase.co',K='sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU',H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'};try{var r1=await fetch(SB+'/rest/v1/projeto_valores?on_conflict=numero_projeto',{method:'POST',headers:H,body:JSON.stringify(V)});var r2=L.length?await fetch(SB+'/rest/v1/projeto_links?on_conflict=numero_projeto',{method:'POST',headers:H,body:JSON.stringify(L)}):{ok:true};if(r1.ok&&r2.ok){var cd=V.filter(function(x){return x.data_inicio}).length;try{await fetch(SB+'/rest/v1/recolhas',{method:'POST',headers:H,body:JSON.stringify({n_valores:V.length,n_links:L.length})})}catch(_){}alert('OK! '+V.length+' valores e '+L.length+' links atualizados no COMISSIONS. ('+cd+' com data)')}else{try{await navigator.clipboard.writeText(JSON.stringify(V))}catch(_){}alert('Envio direto bloqueado (CSP). Copiei '+V.length+' valores - cola no chat com atualiza.')}}catch(e){try{await navigator.clipboard.writeText(JSON.stringify(V))}catch(_){}alert('Envio direto bloqueado. Copiei os valores - cola no chat com atualiza.')}}catch(e){alert('Erro: '+(e.message||e))}})();`
+// Carregador fixo: vai buscar a versão mais recente do atalho à app e executa-a.
+// Só se cola uma vez - as melhorias entram sozinhas no clique seguinte.
+const BOOKMARKLET = `javascript:(async()=>{try{const r=await fetch('https://comissions.cr0x.org/atalho.js?v='+Date.now());if(!r.ok)throw new Error('HTTP '+r.status);(0,eval)(await r.text())}catch(e){alert('Nao consegui carregar o atalho: '+(e.message||e)+' - verifica a ligacao a internet.')}})();`
 
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -269,12 +271,15 @@ export default function Definicoes() {
             <div className="text-sm text-gray-500">Ainda sem recolhas registadas. Após a próxima, aparece aqui o intervalo de datas a usar da vez seguinte.</div>
           )}
         </div>
-        <div className="text-sm text-host-navy font-semibold mb-1">Configurar (só 1 vez)</div>
-        <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1 mb-3">
+        <div className="text-sm text-host-navy font-semibold mb-1">Configurar (só 1 vez, para sempre)</div>
+        <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1 mb-2">
           <li>No Chrome, mostra a barra de favoritos (<b>Ctrl+Shift+B</b>).</li>
-          <li>Botão direito na barra → <b>Adicionar página…</b> (novo favorito).</li>
+          <li>Botão direito na barra → <b>Adicionar página…</b> (ou <b>Editar</b>, se já tens o favorito).</li>
           <li>Nome: <b>Atualizar valores</b>. No campo <b>URL</b>, cola o código copiado abaixo.</li>
         </ol>
+        <p className="text-xs text-gray-500 mb-3">
+          Este código é apenas um <b>carregador</b>: vai buscar a versão mais recente do atalho à app sempre que o clicas. Ou seja, <b>não precisas de voltar a colá-lo</b> quando o atalho for melhorado.
+        </p>
         <div className="flex items-center gap-2 mb-2">
           <button onClick={() => { navigator.clipboard.writeText(BOOKMARKLET); setBmCopiado(true); setTimeout(() => setBmCopiado(false), 2000) }}
             className="bg-host-blue text-white text-sm font-semibold rounded px-4 py-2">{bmCopiado ? '✓ Copiado!' : 'Copiar código do atalho'}</button>
