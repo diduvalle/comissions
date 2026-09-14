@@ -4,9 +4,12 @@ import type { Definicoes as Def, Produto, Destinatario, Papel } from '../types'
 import { MSG_DIR } from '../utils'
 
 const PAPEL_LABEL: Record<Papel, string> = { leitura: 'Leitura', editar: 'Editar', submeter: 'Editar + Submeter' }
+// A data final de uma recolha é sempre o dia em que a corres; logo a seguinte começa no dia a seguir.
+const dData = (d: Date) => d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+const maisDias = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate() + n); return d }
 
 // Atalho (bookmarklet): em Comercial > Propostas, recolhe valores + links + marca num clique.
-const BOOKMARKLET = `javascript:(async()=>{try{var EXT={0:'Host',1:'Hstays',2:'Clever',3:'hey!',5:'ProfileNow'};var toISO=function(v){if(!v)return null;var dt=(v instanceof Date)?v:new Date(v);if(isNaN(dt.getTime()))return null;var y=dt.getFullYear();if(y<2015||y>2100)return null;return y+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')};var pickDate=function(d){var ks=Object.keys(d);var tiers=[/^(datainicio|startdate|datastart|inicio|start|data|date)$/i,/inicio|start/i,/date|data/i];for(var t=0;t<tiers.length;t++){for(var i=0;i<ks.length;i++){if(tiers[t].test(ks[i])){var iso=toISO(d[ks[i]]);if(iso)return iso}}}return null};var S={},V=[],L=[];Ext.ComponentQuery.query('grid').forEach(function(g){var s=g.getStore&&g.getStore();if(s&&s.getCount&&s.getCount()>0&&s.getAt(0).data.hasOwnProperty('Nr')&&s.getAt(0).data.hasOwnProperty('TotalSum')&&s.getAt(0).data.hasOwnProperty('ProjectId')){s.each(function(r){var d=r.data;if(d.Deleted)return;var nr=String(d.Nr);if(!nr||S[nr])return;S[nr]=1;V.push({numero_projeto:nr,cliente:d.ProfileName||null,setup:Math.round(Number(d.TotalSum||0)*100)/100,saas_mes:Math.round(Number(d.SaaSSum||0)*100)/100,marca:EXT[d.ExtType]||'Outro',data_inicio:pickDate(d)});if(d.ProjectId>0)L.push({numero_projeto:nr,data_id:String(d.ProjectId)})})}});if(!V.length){alert('Abre Comercial > Propostas e os separadores das marcas primeiro.');return}var SB='https://bhurcadussdjohbngekq.supabase.co',K='sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU',H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'};try{var r1=await fetch(SB+'/rest/v1/projeto_valores?on_conflict=numero_projeto',{method:'POST',headers:H,body:JSON.stringify(V)});var r2=L.length?await fetch(SB+'/rest/v1/projeto_links?on_conflict=numero_projeto',{method:'POST',headers:H,body:JSON.stringify(L)}):{ok:true};if(r1.ok&&r2.ok){var cd=V.filter(function(x){return x.data_inicio}).length;alert('OK! '+V.length+' valores e '+L.length+' links atualizados no COMISSIONS. ('+cd+' com data)')}else{try{await navigator.clipboard.writeText(JSON.stringify(V))}catch(_){}alert('Envio direto bloqueado (CSP). Copiei '+V.length+' valores - cola no chat com atualiza.')}}catch(e){try{await navigator.clipboard.writeText(JSON.stringify(V))}catch(_){}alert('Envio direto bloqueado. Copiei os valores - cola no chat com atualiza.')}}catch(e){alert('Erro: '+(e.message||e))}})();`
+const BOOKMARKLET = `javascript:(async()=>{try{var EXT={0:'Host',1:'Hstays',2:'Clever',3:'hey!',5:'ProfileNow'};var toISO=function(v){if(!v)return null;var dt=(v instanceof Date)?v:new Date(v);if(isNaN(dt.getTime()))return null;var y=dt.getFullYear();if(y<2015||y>2100)return null;return y+'-'+String(dt.getMonth()+1).padStart(2,'0')+'-'+String(dt.getDate()).padStart(2,'0')};var pickDate=function(d){var ks=Object.keys(d);var tiers=[/^(datainicio|startdate|datastart|inicio|start|data|date)$/i,/inicio|start/i,/date|data/i];for(var t=0;t<tiers.length;t++){for(var i=0;i<ks.length;i++){if(tiers[t].test(ks[i])){var iso=toISO(d[ks[i]]);if(iso)return iso}}}return null};var S={},V=[],L=[];Ext.ComponentQuery.query('grid').forEach(function(g){var s=g.getStore&&g.getStore();if(s&&s.getCount&&s.getCount()>0&&s.getAt(0).data.hasOwnProperty('Nr')&&s.getAt(0).data.hasOwnProperty('TotalSum')&&s.getAt(0).data.hasOwnProperty('ProjectId')){s.each(function(r){var d=r.data;if(d.Deleted)return;var nr=String(d.Nr);if(!nr||S[nr])return;S[nr]=1;V.push({numero_projeto:nr,cliente:d.ProfileName||null,setup:Math.round(Number(d.TotalSum||0)*100)/100,saas_mes:Math.round(Number(d.SaaSSum||0)*100)/100,marca:EXT[d.ExtType]||'Outro',data_inicio:pickDate(d)});if(d.ProjectId>0)L.push({numero_projeto:nr,data_id:String(d.ProjectId)})})}});if(!V.length){alert('Abre Comercial > Propostas e os separadores das marcas primeiro.');return}var SB='https://bhurcadussdjohbngekq.supabase.co',K='sb_publishable_eKHXqa4aW7SwV8zx_euepA_ngZ3U5NU',H={apikey:K,Authorization:'Bearer '+K,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'};try{var r1=await fetch(SB+'/rest/v1/projeto_valores?on_conflict=numero_projeto',{method:'POST',headers:H,body:JSON.stringify(V)});var r2=L.length?await fetch(SB+'/rest/v1/projeto_links?on_conflict=numero_projeto',{method:'POST',headers:H,body:JSON.stringify(L)}):{ok:true};if(r1.ok&&r2.ok){var cd=V.filter(function(x){return x.data_inicio}).length;try{await fetch(SB+'/rest/v1/recolhas',{method:'POST',headers:H,body:JSON.stringify({n_valores:V.length,n_links:L.length})})}catch(_){}alert('OK! '+V.length+' valores e '+L.length+' links atualizados no COMISSIONS. ('+cd+' com data)')}else{try{await navigator.clipboard.writeText(JSON.stringify(V))}catch(_){}alert('Envio direto bloqueado (CSP). Copiei '+V.length+' valores - cola no chat com atualiza.')}}catch(e){try{await navigator.clipboard.writeText(JSON.stringify(V))}catch(_){}alert('Envio direto bloqueado. Copiei os valores - cola no chat com atualiza.')}}catch(e){alert('Erro: '+(e.message||e))}})();`
 
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -33,10 +36,13 @@ export default function Definicoes() {
   const [dests, setDests] = useState<Destinatario[]>([])
   const [novoDest, setNovoDest] = useState<{ nome: string; email: string; papel: Papel }>({ nome: '', email: '', papel: 'leitura' })
   const [destMsg, setDestMsg] = useState('')
+  const [recolha, setRecolha] = useState<any>(null)
 
   async function carregarDests() {
     const { data } = await supabase.from('destinatarios').select('*').order('ordem').order('criado_em')
     setDests((data as any) || [])
+    const { data: r } = await supabase.from('recolhas').select('*').order('data_recolha', { ascending: false }).limit(1).maybeSingle()
+    setRecolha(r || null)
   }
   async function guardarDest(d: Destinatario) {
     const { error } = await supabase.from('destinatarios').update({ nome: d.nome, email: d.email.trim(), papel: d.papel, ativo: d.ativo }).eq('id', d.id)
@@ -243,6 +249,26 @@ export default function Definicoes() {
         <p className="text-sm text-gray-500 mb-3">
           Os valores (Setup/SaaS) que pré-preenchem as novas linhas vêm da plataforma HostPMS. Como a plataforma exige a <b>tua sessão autenticada</b>, a atualização parte sempre de ti - mas fica a <b>1 clique</b> com o atalho abaixo.
         </p>
+
+        {/* Que intervalo de datas usar na próxima recolha (evita buracos e memória) */}
+        <div className="mb-4 rounded-lg border border-host-blue/30 bg-blue-50/60 p-3">
+          {recolha ? (
+            <>
+              <div className="text-sm text-host-navy">
+                <b>Última recolha:</b> {dData(new Date(recolha.data_recolha))}
+                <span className="text-gray-500"> · {recolha.n_valores} valores</span>
+              </div>
+              <div className="text-sm text-host-navy mt-1">
+                <b>Próxima:</b> no Assist, filtra <b className="text-host-blue">de {dData(maisDias(recolha.data_recolha, 1))}</b> até ao dia em que a correres.
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Com margem de segurança, começa antes - em <b>{dData(maisDias(recolha.data_recolha, -3))}</b>. Sobrepor é inofensivo (não duplica valores e o aviso <i>"já na lista"</i> protege-te); já um buraco perde comissões sem avisar.
+              </div>
+            </>
+          ) : (
+            <div className="text-sm text-gray-500">Ainda sem recolhas registadas. Após a próxima, aparece aqui o intervalo de datas a usar da vez seguinte.</div>
+          )}
+        </div>
         <div className="text-sm text-host-navy font-semibold mb-1">Configurar (só 1 vez)</div>
         <ol className="list-decimal ml-5 text-sm text-gray-600 space-y-1 mb-3">
           <li>No Chrome, mostra a barra de favoritos (<b>Ctrl+Shift+B</b>).</li>
