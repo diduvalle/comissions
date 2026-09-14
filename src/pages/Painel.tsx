@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Comissao, Produto, Cliente, Estado, Destinatario, Papel } from '../types'
-import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl, nextMref, porNumero } from '../utils'
+import { eur, fmtDate, mrefLabel, sortMrefsDesc, parseMref, dateToMref, platformUrl, nextMref, porNumero, ABBR } from '../utils'
 import { updateComissao, getOrCreateCliente } from '../data'
+import { exportarExcel, lerExcel } from '../excel'
 import { IconClock, IconDownload, IconLock, IconSearch, IconWarn, IconEdit, IconTrash, IconCheck } from '../components/icons'
 
 const ESTADOS: Estado[] = ['pendente', 'parcial', 'paga']
@@ -38,6 +39,10 @@ export default function Painel() {
   const [mostrarEnviar, setMostrarEnviar] = useState(false)
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState<any[] | null>(null)
+  const [excelMsg, setExcelMsg] = useState('')
+  const [preview, setPreview] = useState<any[] | null>(null)
+  const [aplicando, setAplicando] = useState(false)
+  const ficheiroRef = useRef<HTMLInputElement>(null)
 
   // silent = recarrega sem o ecrã "A carregar…" (mantém a posição de scroll ao adicionar linhas)
   async function carregar(silent = false) {
@@ -138,6 +143,93 @@ export default function Painel() {
     await patch(c, { finalizada: !c.finalizada } as any)
   }
 
+  // ===== Excel: exportar o mapa e reimportar o ficheiro preenchido =====
+  const linhasDoMapa = () => visiveis.filter(emAberto).sort(porNumero)
+
+  async function exportar() {
+    setExcelMsg('A gerar…')
+    try {
+      const { year, month } = parseMref(sel)
+      const nome = `MAPA COMISSÕES-${(def?.gestor_nome || 'Diogo Vale').replace(/ /g, '_')}_${year}_${ABBR[month]}.xlsx`
+      await exportarExcel(linhasDoMapa(), sel, produtos, nome)
+      setExcelMsg('✓ Descarregado')
+    } catch (e: any) { setExcelMsg('Erro: ' + e.message) }
+    setTimeout(() => setExcelMsg(''), 3000)
+  }
+
+  // estado que uma linha passa a ter, dado o valor pago e o que é devido
+  const estadoPara = (devido: number, pago: number): Estado =>
+    (pago > 0 && pago >= devido - 0.005) ? 'paga' : (pago > 0 ? 'parcial' : 'pendente')
+
+  async function aoEscolherFicheiro(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setExcelMsg('A ler o ficheiro…')
+    try {
+      const lidas = await lerExcel(f)
+      const porId = new Map(comissoes.map((c) => [c.id, c]))
+      const mudancas: any[] = []
+      let ignoradas = 0
+
+      for (const l of lidas) {
+        const c = l.id ? porId.get(l.id) : undefined
+        if (!c) { ignoradas++; continue }
+        const patch: any = {}
+
+        // % alterada -> recalcula a comissão
+        let comissao = Number(c.comissao_calculada || 0)
+        if (l.pct != null && Math.abs(l.pct - Number(c.percentagem || 0)) > 0.001) {
+          patch.percentagem = l.pct
+          comissao = Math.round(Number(c.valor_venda || 0) * l.pct) / 100
+          patch.comissao_calculada = comissao
+        }
+        const devido = c.partilhada ? Math.round(comissao * 50) / 100 : comissao
+
+        // "Comissão Paga": número = valor pago; PAGO (-1) = paga por inteiro; vazio = sem alteração
+        if (l.pago != null) {
+          const novoPago = l.pago === -1 ? devido : l.pago
+          if (Math.abs(novoPago - Number(c.valor_pago || 0)) > 0.005) patch.valor_pago = novoPago
+          const est = estadoPara(devido, novoPago)
+          if (est !== c.estado) patch.estado = est
+        } else if (patch.comissao_calculada != null) {
+          const est = estadoPara(devido, Number(c.valor_pago || 0))
+          if (est !== c.estado) patch.estado = est
+        }
+
+        if (l.obs && l.obs !== (c.observacoes || '')) patch.observacoes = l.obs
+
+        if (Object.keys(patch).length) mudancas.push({ c, patch })
+      }
+
+      const aviso = ignoradas > 0
+        ? `${ignoradas} linha(s) do ficheiro não foram reconhecidas (adicionadas à mão ou sem referência) e são ignoradas.`
+        : ''
+      if (!mudancas.length) {
+        setExcelMsg(`Li ${lidas.length} linhas, mas não há nada para alterar. ${aviso}`.trim())
+        setTimeout(() => setExcelMsg(''), 8000)
+      } else {
+        setExcelMsg('')
+        setPreview(Object.assign(mudancas, { aviso }))
+      }
+    } catch (err: any) {
+      setExcelMsg('Erro a ler: ' + err.message)
+    } finally {
+      if (ficheiroRef.current) ficheiroRef.current.value = ''
+    }
+  }
+
+  async function aplicarImport() {
+    if (!preview) return
+    setAplicando(true)
+    try {
+      for (const m of preview) await updateComissao(m.c, m.patch, 'diretor (Excel)')
+      setPreview(null)
+      setExcelMsg(`✓ ${preview.length} linha(s) atualizada(s)`)
+      await carregar(true)
+    } catch (e: any) { setExcelMsg('Erro: ' + e.message) } finally { setAplicando(false) }
+    setTimeout(() => setExcelMsg(''), 4000)
+  }
+
   // abre a janela de validação (não envia nada ainda)
   function abrirEnviar() {
     setResultado(null)
@@ -177,9 +269,21 @@ export default function Painel() {
           {!aberto && selFechado && <span title="O diretor já reviu e concluiu este mês" className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 px-2 py-1"><IconLock className="w-3 h-3" /> concluído pelo diretor</span>}
         </div>
         {!aberto && (
-          <button onClick={abrirEnviar} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-5 py-2 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
-            {selFechado ? 'Reenviar' : 'Enviar'}
-          </button>
+          <div className="flex items-center gap-2">
+            {excelMsg && <span className="text-xs text-gray-500">{excelMsg}</span>}
+            <button onClick={exportar} title="Descarregar o mapa em Excel, no formato original, para o diretor preencher à mão"
+              className="border border-host-blue text-host-blue text-sm font-semibold rounded-lg px-3 py-2 hover:bg-host-blue hover:text-white transition-colors">
+              ↓ Excel
+            </button>
+            <button onClick={() => ficheiroRef.current?.click()} title="Carregar o Excel devolvido pelo diretor e atualizar as linhas"
+              className="border border-gray-300 text-gray-600 text-sm font-semibold rounded-lg px-3 py-2 hover:border-host-blue hover:text-host-blue transition-colors">
+              ↑ Importar
+            </button>
+            <input ref={ficheiroRef} type="file" accept=".xlsx" onChange={aoEscolherFicheiro} className="hidden" />
+            <button onClick={abrirEnviar} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-5 py-2 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
+              {selFechado ? 'Reenviar' : 'Enviar'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -324,6 +428,65 @@ export default function Painel() {
 
       {editar && <EditarLinha comissao={editar} produtos={produtos} clientes={clientes} onClose={() => setEditar(null)} onSaved={carregar} />}
       {hist && <HistoricoLinha comissao={hist} onClose={() => setHist(null)} />}
+
+      {/* Pré-visualização do Excel importado - nada é gravado sem confirmar */}
+      {preview && (
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-[6vh] overflow-y-auto" onClick={() => !aplicando && setPreview(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-5 my-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-host-navy mb-1">Importar Excel - {preview.length} alteração(ões)</h3>
+            <p className="text-sm text-gray-500 mb-4">Confere antes de gravar. Só as linhas abaixo são alteradas; o resto fica intacto.</p>
+
+            <div className="max-h-[50vh] overflow-auto border rounded-lg">
+              <table className="w-full text-[12px]">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr className="text-left text-gray-500 border-b">
+                    <th className="px-2 py-2 font-medium">Nº</th>
+                    <th className="px-2 py-2 font-medium">Cliente</th>
+                    <th className="px-2 py-2 font-medium">Produto</th>
+                    <th className="px-2 py-2 font-medium">Alteração</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.map((m: any, i: number) => (
+                    <tr key={i} className="border-b last:border-0">
+                      <td className="px-2 py-1.5 tabular-nums">{m.c.numero_projeto}</td>
+                      <td className="px-2 py-1.5 truncate max-w-[160px]" title={m.c.cliente?.nome}>{m.c.cliente?.nome}</td>
+                      <td className="px-2 py-1.5">{m.c.produto?.tipo}</td>
+                      <td className="px-2 py-1.5">
+                        {m.patch.valor_pago != null && (
+                          <div>Pago: <span className="text-gray-400">{m.c.valor_pago != null ? eur(m.c.valor_pago) : '-'}</span> → <b className="text-green-700">{eur(m.patch.valor_pago)}</b></div>
+                        )}
+                        {m.patch.percentagem != null && (
+                          <div>%: <span className="text-gray-400">{Number(m.c.percentagem)}%</span> → <b className="text-host-blue">{m.patch.percentagem}%</b> (comissão {eur(m.patch.comissao_calculada)})</div>
+                        )}
+                        {m.patch.estado && (
+                          <div>Estado: <span className="text-gray-400">{m.c.estado}</span> → <b>{m.patch.estado}</b></div>
+                        )}
+                        {m.patch.observacoes && (
+                          <div className="text-gray-500 truncate max-w-[280px]" title={m.patch.observacoes}>Obs.: {m.patch.observacoes}</div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {(preview as any).aviso && (
+              <p className="text-[11px] text-orange-600 mt-2">⚠ {(preview as any).aviso}</p>
+            )}
+            <p className="text-[11px] text-gray-400 mt-2">Cada alteração fica registada no histórico da linha, atribuída a "diretor (Excel)".</p>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setPreview(null)} disabled={aplicando} className="px-4 py-2 rounded-lg border text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+              <button onClick={aplicarImport} disabled={aplicando}
+                className="px-5 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold shadow-glow hover:bg-host-bluedark disabled:opacity-50">
+                {aplicando ? 'A aplicar…' : `Aplicar ${preview.length} alteração(ões)`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Janela de validação antes de enviar - mostra para quem vai e como */}
       {mostrarEnviar && (
