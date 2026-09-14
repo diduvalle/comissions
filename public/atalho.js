@@ -45,7 +45,10 @@
       const s = g.getStore && g.getStore()
       if (!s || !s.getCount || s.getCount() === 0) return
       const d0 = s.getAt(0).data
-      if (!d0.hasOwnProperty('Nr') || !d0.hasOwnProperty('TotalSum') || !d0.hasOwnProperty('ProjectId')) return
+      // exige TODOS os campos exclusivos da grelha de Propostas - assim outras grelhas
+      // do Assist (tickets, projetos, etc.) nunca são recolhidas por engano
+      const obrigatorios = ['Nr', 'TotalSum', 'SaaSSum', 'ProjectId', 'ProfileName', 'ExtType']
+      if (!obrigatorios.every((c) => d0.hasOwnProperty(c))) return
       s.each((r) => {
         const d = r.data
         if (d.Deleted) return
@@ -70,6 +73,20 @@
     }
 
     const comData = valores.filter((x) => x.data_inicio).length
+
+    // Confirmação: nada é gravado sem veres o que vai ser enviado (rede de segurança
+    // contra cliques acidentais noutras páginas do Assist).
+    const amostra = valores.slice(0, 3).map((v) => '  ' + v.numero_projeto + '  ' + (v.cliente || '')).join('\n')
+    const resumo = [
+      'Enviar ' + valores.length + ' valores e ' + links.length + ' links para o COMISSIONS?',
+      '',
+      'Exemplos:',
+      amostra + (valores.length > 3 ? '\n  ...' : ''),
+      '',
+      'Se isto não parecem propostas tuas, cancela.',
+    ].join('\n')
+    if (!confirm(resumo)) return
+
     const copiarParaChat = async () => {
       try { await navigator.clipboard.writeText(JSON.stringify(valores)) } catch (_) {}
     }
