@@ -166,7 +166,7 @@ export default function Painel() {
     if (!f) return
     setExcelMsg('A ler o ficheiro…')
     try {
-      const lidas = await lerExcel(f)
+      const { linhas: lidas, bonus } = await lerExcel(f)
       const porId = new Map(comissoes.map((c) => [c.id, c]))
       const mudancas: any[] = []
       const naoReconhecidas: any[] = []
@@ -201,12 +201,17 @@ export default function Painel() {
         if (Object.keys(patch).length) mudancas.push({ c, patch })
       }
 
-      if (!mudancas.length && !naoReconhecidas.length) {
+      // bónus escrito no rodapé do Excel -> aplica-se ao envio deste mês
+      const { data: env } = await supabase.from('envios').select('id,bonus').eq('mes_referencia', sel).order('data_envio', { ascending: false }).limit(1).maybeSingle()
+      const bonusMudou = bonus != null && env && Math.abs(bonus - Number(env.bonus || 0)) > 0.005
+      const mudancaBonus = bonusMudou ? { envioId: (env as any).id, antes: Number((env as any).bonus || 0), depois: bonus } : null
+
+      if (!mudancas.length && !naoReconhecidas.length && !mudancaBonus) {
         setExcelMsg(`Li ${lidas.length} linhas, mas não há nada para alterar.`)
         setTimeout(() => setExcelMsg(''), 6000)
       } else {
         setExcelMsg('')
-        setPreview({ mudancas, naoReconhecidas })
+        setPreview({ mudancas, naoReconhecidas, mudancaBonus })
       }
     } catch (err: any) {
       setExcelMsg('Erro a ler: ' + err.message)
@@ -220,9 +225,12 @@ export default function Painel() {
     setAplicando(true)
     try {
       for (const m of preview.mudancas) await updateComissao(m.c, m.patch, 'diretor (Excel)')
+      if (preview.mudancaBonus) {
+        await supabase.from('envios').update({ bonus: preview.mudancaBonus.depois }).eq('id', preview.mudancaBonus.envioId)
+      }
       const n = preview.mudancas.length
       setPreview(null)
-      setExcelMsg(`✓ ${n} linha(s) atualizada(s)`)
+      setExcelMsg(`✓ ${n} linha(s) atualizada(s)${preview.mudancaBonus ? ' + bónus' : ''}`)
       await carregar(true)
     } catch (e: any) { setExcelMsg('Erro: ' + e.message) } finally { setAplicando(false) }
     setTimeout(() => setExcelMsg(''), 4000)
@@ -473,6 +481,13 @@ export default function Painel() {
 
             )}
 
+            {preview.mudancaBonus && (
+              <div className="mt-4 rounded-lg border border-host-blue/30 bg-blue-50 p-3 text-sm">
+                <b className="text-host-navy">Bónus de {mrefLabel(sel)}:</b>{' '}
+                <span className="text-gray-400">{eur(preview.mudancaBonus.antes)}</span> → <b className="text-host-blue">{eur(preview.mudancaBonus.depois)}</b>
+              </div>
+            )}
+
             {/* linhas que ele acrescentou à mão: não têm referência, por isso têm de ser
                 adicionadas por ti - mostramos quais para não se perderem */}
             {preview.naoReconhecidas.length > 0 && (
@@ -498,12 +513,12 @@ export default function Painel() {
 
             <div className="flex justify-end gap-2 mt-4">
               <button onClick={() => setPreview(null)} disabled={aplicando} className="px-4 py-2 rounded-lg border text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
-                {preview.mudancas.length ? 'Cancelar' : 'Fechar'}
+                {preview.mudancas.length || preview.mudancaBonus ? 'Cancelar' : 'Fechar'}
               </button>
-              {preview.mudancas.length > 0 && (
+              {(preview.mudancas.length > 0 || preview.mudancaBonus) && (
                 <button onClick={aplicarImport} disabled={aplicando}
                   className="px-5 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold shadow-glow hover:bg-host-bluedark disabled:opacity-50">
-                  {aplicando ? 'A aplicar…' : `Aplicar ${preview.mudancas.length} alteração(ões)`}
+                  {aplicando ? 'A aplicar…' : `Aplicar ${preview.mudancas.length + (preview.mudancaBonus ? 1 : 0)} alteração(ões)`}
                 </button>
               )}
             </div>
