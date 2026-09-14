@@ -40,7 +40,7 @@ export default function Painel() {
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState<any[] | null>(null)
   const [excelMsg, setExcelMsg] = useState('')
-  const [preview, setPreview] = useState<any[] | null>(null)
+  const [preview, setPreview] = useState<any>(null)
   const [aplicando, setAplicando] = useState(false)
   const ficheiroRef = useRef<HTMLInputElement>(null)
 
@@ -169,11 +169,11 @@ export default function Painel() {
       const lidas = await lerExcel(f)
       const porId = new Map(comissoes.map((c) => [c.id, c]))
       const mudancas: any[] = []
-      let ignoradas = 0
+      const naoReconhecidas: any[] = []
 
       for (const l of lidas) {
         const c = l.id ? porId.get(l.id) : undefined
-        if (!c) { ignoradas++; continue }
+        if (!c) { naoReconhecidas.push(l); continue }
         const patch: any = {}
 
         // % alterada -> recalcula a comissão
@@ -201,15 +201,12 @@ export default function Painel() {
         if (Object.keys(patch).length) mudancas.push({ c, patch })
       }
 
-      const aviso = ignoradas > 0
-        ? `${ignoradas} linha(s) do ficheiro não foram reconhecidas (adicionadas à mão ou sem referência) e são ignoradas.`
-        : ''
-      if (!mudancas.length) {
-        setExcelMsg(`Li ${lidas.length} linhas, mas não há nada para alterar. ${aviso}`.trim())
-        setTimeout(() => setExcelMsg(''), 8000)
+      if (!mudancas.length && !naoReconhecidas.length) {
+        setExcelMsg(`Li ${lidas.length} linhas, mas não há nada para alterar.`)
+        setTimeout(() => setExcelMsg(''), 6000)
       } else {
         setExcelMsg('')
-        setPreview(Object.assign(mudancas, { aviso }))
+        setPreview({ mudancas, naoReconhecidas })
       }
     } catch (err: any) {
       setExcelMsg('Erro a ler: ' + err.message)
@@ -222,9 +219,10 @@ export default function Painel() {
     if (!preview) return
     setAplicando(true)
     try {
-      for (const m of preview) await updateComissao(m.c, m.patch, 'diretor (Excel)')
+      for (const m of preview.mudancas) await updateComissao(m.c, m.patch, 'diretor (Excel)')
+      const n = preview.mudancas.length
       setPreview(null)
-      setExcelMsg(`✓ ${preview.length} linha(s) atualizada(s)`)
+      setExcelMsg(`✓ ${n} linha(s) atualizada(s)`)
       await carregar(true)
     } catch (e: any) { setExcelMsg('Erro: ' + e.message) } finally { setAplicando(false) }
     setTimeout(() => setExcelMsg(''), 4000)
@@ -433,9 +431,10 @@ export default function Painel() {
       {preview && (
         <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-[6vh] overflow-y-auto" onClick={() => !aplicando && setPreview(null)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-5 my-auto" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-host-navy mb-1">Importar Excel - {preview.length} alteração(ões)</h3>
+            <h3 className="text-lg font-bold text-host-navy mb-1">Importar Excel - {preview.mudancas.length} alteração(ões)</h3>
             <p className="text-sm text-gray-500 mb-4">Confere antes de gravar. Só as linhas abaixo são alteradas; o resto fica intacto.</p>
 
+            {preview.mudancas.length > 0 && (
             <div className="max-h-[50vh] overflow-auto border rounded-lg">
               <table className="w-full text-[12px]">
                 <thead className="bg-gray-50 sticky top-0">
@@ -447,7 +446,7 @@ export default function Painel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.map((m: any, i: number) => (
+                  {preview.mudancas.map((m: any, i: number) => (
                     <tr key={i} className="border-b last:border-0">
                       <td className="px-2 py-1.5 tabular-nums">{m.c.numero_projeto}</td>
                       <td className="px-2 py-1.5 truncate max-w-[160px]" title={m.c.cliente?.nome}>{m.c.cliente?.nome}</td>
@@ -472,17 +471,41 @@ export default function Painel() {
               </table>
             </div>
 
-            {(preview as any).aviso && (
-              <p className="text-[11px] text-orange-600 mt-2">⚠ {(preview as any).aviso}</p>
             )}
+
+            {/* linhas que ele acrescentou à mão: não têm referência, por isso têm de ser
+                adicionadas por ti - mostramos quais para não se perderem */}
+            {preview.naoReconhecidas.length > 0 && (
+              <div className="mt-4 rounded-lg border border-orange-300 bg-orange-50 p-3">
+                <div className="text-sm font-semibold text-orange-800 mb-1">
+                  ⚠ {preview.naoReconhecidas.length} linha(s) não reconhecida(s) - acrescenta-as tu
+                </div>
+                <p className="text-xs text-orange-700 mb-2">
+                  Foram escritas à mão no Excel, por isso não têm referência e não podem ser importadas. Adiciona-as na linha do fundo do painel:
+                </p>
+                <ul className="text-xs text-orange-900 space-y-0.5">
+                  {preview.naoReconhecidas.map((l: any, i: number) => (
+                    <li key={i}>
+                      <b>{l.numero || '(sem nº)'}</b>{l.cliente ? ` · ${l.cliente}` : ''}{l.produto ? ` · ${l.produto}` : ''}
+                      {l.pago != null && l.pago !== -1 ? ` · pago ${eur(l.pago)}` : (l.pago === -1 ? ' · PAGO' : '')}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <p className="text-[11px] text-gray-400 mt-2">Cada alteração fica registada no histórico da linha, atribuída a "diretor (Excel)".</p>
 
             <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setPreview(null)} disabled={aplicando} className="px-4 py-2 rounded-lg border text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
-              <button onClick={aplicarImport} disabled={aplicando}
-                className="px-5 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold shadow-glow hover:bg-host-bluedark disabled:opacity-50">
-                {aplicando ? 'A aplicar…' : `Aplicar ${preview.length} alteração(ões)`}
+              <button onClick={() => setPreview(null)} disabled={aplicando} className="px-4 py-2 rounded-lg border text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">
+                {preview.mudancas.length ? 'Cancelar' : 'Fechar'}
               </button>
+              {preview.mudancas.length > 0 && (
+                <button onClick={aplicarImport} disabled={aplicando}
+                  className="px-5 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold shadow-glow hover:bg-host-bluedark disabled:opacity-50">
+                  {aplicando ? 'A aplicar…' : `Aplicar ${preview.mudancas.length} alteração(ões)`}
+                </button>
+              )}
             </div>
           </div>
         </div>

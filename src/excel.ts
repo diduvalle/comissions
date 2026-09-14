@@ -90,6 +90,8 @@ export async function exportarExcel(linhas: Comissao[], mref: string, produtos: 
 export type LinhaLida = {
   id: string | null
   numero: string
+  cliente: string
+  produto: string
   pago: number | null   // null = célula vazia (sem alteração)
   pct: number | null
   obs: string | null
@@ -136,6 +138,8 @@ export async function lerExcel(file: File): Promise<LinhaLida[]> {
   const cPago = cabs['comissão paga']
   const cPct = cabs['%']
   const cObs = cabs['observações']
+  const cCli = cabs['cliente']
+  const cProd = cabs['produto']
   if (!cPago) throw new Error('Não encontrei a coluna "Comissão Paga" no ficheiro.')
 
   const out: LinhaLida[] = []
@@ -152,6 +156,8 @@ export async function lerExcel(file: File): Promise<LinhaLida[]> {
     out.push({
       id: id || null,
       numero,
+      cliente: cCli ? texto(row.getCell(cCli).value).trim() : '',
+      produto: cProd ? texto(row.getCell(cProd).value).trim() : '',
       pago: pagoRaw === 'PAGO' ? -1 : (pagoRaw as number | null), // -1 = marcar como totalmente paga
       pct: typeof pctRaw === 'number' ? (pctRaw <= 1 ? pctRaw * 100 : pctRaw) : null,
       obs: cObs ? texto(row.getCell(cObs).value).trim() : null,
