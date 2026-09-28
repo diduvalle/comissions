@@ -164,7 +164,8 @@ export type LinhaLida = {
   pct: number | null
   obs: string | null
 }
-export type LeituraExcel = { linhas: LinhaLida[]; bonus: number | null }
+// totalFicheiro = o 'Total comissão paga' calculado pelo próprio Excel (serve para reconciliar)
+export type LeituraExcel = { linhas: LinhaLida[]; bonus: number | null; totalFicheiro: number | null }
 
 // "25,48 €" / "25,48" / 25.48 / "PAGO" -> número (ou 'PAGO' / null)
 function lerValor(v: any): number | 'PAGO' | null {
@@ -212,6 +213,7 @@ export async function lerExcel(file: File): Promise<LeituraExcel> {
 
   const linhas: LinhaLida[] = []
   let bonus: number | null = null
+  let totalFicheiro: number | null = null
 
   ws.eachRow((row: any, n: number) => {
     if (n === 1) return
@@ -223,7 +225,13 @@ export async function lerExcel(file: File): Promise<LeituraExcel> {
       if (typeof v === 'number') bonus = v
       return
     }
-    if (rotulo.startsWith('total') || rotulo.startsWith('a pagar')) return
+    if (rotulo.startsWith('total')) {
+      // o Excel guarda o resultado da fórmula ao gravar; se não houver, fica null
+      const v = lerValor(row.getCell(cPago).value)
+      if (typeof v === 'number') totalFicheiro = v
+      return
+    }
+    if (rotulo.startsWith('a pagar')) return
 
     const id = cRef ? texto(row.getCell(cRef).value).trim() : ''
     const numero = texto(row.getCell(cNum).value).trim()
@@ -243,5 +251,5 @@ export async function lerExcel(file: File): Promise<LeituraExcel> {
     })
   })
 
-  return { linhas, bonus }
+  return { linhas, bonus, totalFicheiro }
 }

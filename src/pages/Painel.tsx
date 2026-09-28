@@ -166,10 +166,14 @@ export default function Painel() {
     if (!f) return
     setExcelMsg('A ler o ficheiro…')
     try {
-      const { linhas: lidas, bonus } = await lerExcel(f)
+      const { linhas: lidas, bonus, totalFicheiro } = await lerExcel(f)
       const porId = new Map(comissoes.map((c) => [c.id, c]))
       const mudancas: any[] = []
       const naoReconhecidas: any[] = []
+      // totais para validar de uma só olhada
+      let somaLida = 0      // soma da coluna "Comissão Paga" que a app conseguiu ler
+      let jaPagoAntes = 0   // parte dessas linhas que já tinha sido paga em meses anteriores
+      let nPagas = 0, nParciais = 0
 
       for (const l of lidas) {
         const c = l.id ? porId.get(l.id) : undefined
@@ -188,6 +192,10 @@ export default function Painel() {
         // "Comissão Paga": número = valor pago; PAGO (-1) = paga por inteiro; vazio = sem alteração
         if (l.pago != null) {
           const novoPago = l.pago === -1 ? devido : l.pago
+          somaLida += novoPago
+          jaPagoAntes += Math.min(novoPago, Number((c as any).pago_anterior || 0))
+          if (estadoPara(devido, novoPago) === 'paga') nPagas++
+          else if (novoPago > 0) nParciais++
           if (Math.abs(novoPago - Number(c.valor_pago || 0)) > 0.005) patch.valor_pago = novoPago
           const est = estadoPara(devido, novoPago)
           if (est !== c.estado) patch.estado = est
@@ -211,7 +219,17 @@ export default function Painel() {
         setTimeout(() => setExcelMsg(''), 6000)
       } else {
         setExcelMsg('')
-        setPreview({ mudancas, naoReconhecidas, mudancaBonus })
+        const bonusFinal = bonus != null ? bonus : Number((env as any)?.bonus || 0)
+        const aPagarMes = Math.round((somaLida - jaPagoAntes) * 100) / 100
+        setPreview({
+          mudancas, naoReconhecidas, mudancaBonus,
+          totais: {
+            somaLida: Math.round(somaLida * 100) / 100,
+            totalFicheiro, jaPagoAntes: Math.round(jaPagoAntes * 100) / 100,
+            bonus: bonusFinal, aPagarMes, total: Math.round((aPagarMes + bonusFinal) * 100) / 100,
+            nPagas, nParciais,
+          },
+        })
       }
     } catch (err: any) {
       setExcelMsg('Erro a ler: ' + err.message)
@@ -441,6 +459,50 @@ export default function Painel() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-5 my-auto" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-host-navy mb-1">Importar Excel - {preview.mudancas.length} alteração(ões)</h3>
             <p className="text-sm text-gray-500 mb-4">Confere antes de gravar. Só as linhas abaixo são alteradas; o resto fica intacto.</p>
+
+            {/* Resumo para validar de uma só olhada, com reconciliação contra o total do próprio Excel */}
+            {preview.totais && (() => {
+              const t = preview.totais
+              const temTotalExcel = t.totalFicheiro != null
+              const bate = temTotalExcel && Math.abs(t.somaLida - t.totalFicheiro) < 0.01
+              return (
+                <div className="mb-4 rounded-xl border bg-gray-50 p-4 text-sm">
+                  <div className="text-xs text-gray-500 mb-3">
+                    <b className="text-host-navy">{preview.mudancas.length}</b> linha(s) alterada(s)
+                    {t.nPagas > 0 && <> · <b className="text-green-700">{t.nPagas}</b> paga(s)</>}
+                    {t.nParciais > 0 && <> · <b className="text-orange-600">{t.nParciais}</b> parcial(ais)</>}
+                  </div>
+
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-gray-600">Soma "Comissão Paga" (ficheiro)</span>
+                    <span className="tabular-nums font-semibold text-host-navy">{eur(t.somaLida)}</span>
+                  </div>
+                  {temTotalExcel && (
+                    <div className={`text-xs text-right mt-0.5 ${bate ? 'text-green-700' : 'text-orange-600 font-semibold'}`}>
+                      {bate
+                        ? '✓ bate certo com o total do Excel'
+                        : `⚠ o total do Excel é ${eur(t.totalFicheiro)} - diferença de ${eur(Math.abs(t.totalFicheiro - t.somaLida))}`}
+                    </div>
+                  )}
+
+                  {t.jaPagoAntes > 0.005 && (
+                    <div className="flex justify-between items-baseline mt-1.5 text-gray-500">
+                      <span>− Já pago em meses anteriores</span>
+                      <span className="tabular-nums">−{eur(t.jaPagoAntes)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-baseline mt-1.5 text-gray-600">
+                    <span>+ Bónus</span>
+                    <span className="tabular-nums">{eur(t.bonus)}</span>
+                  </div>
+
+                  <div className="flex justify-between items-baseline mt-3 pt-3 border-t border-gray-300">
+                    <span className="font-bold text-host-navy">A PAGAR - {mrefLabel(sel)}</span>
+                    <span className="tabular-nums text-lg font-bold text-host-blue">{eur(t.total)}</span>
+                  </div>
+                </div>
+              )
+            })()}
 
             {preview.mudancas.length > 0 && (
             <div className="max-h-[50vh] overflow-auto border rounded-lg">
