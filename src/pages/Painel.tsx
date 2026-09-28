@@ -43,6 +43,8 @@ export default function Painel() {
   const [preview, setPreview] = useState<any>(null)
   const [aplicando, setAplicando] = useState(false)
   const ficheiroRef = useRef<HTMLInputElement>(null)
+  const [fecho, setFecho] = useState<any>(null)   // dados da janela "Fechar mês"
+  const [fechando, setFechando] = useState(false)
 
   // silent = recarrega sem o ecrã "A carregar…" (mantém a posição de scroll ao adicionar linhas)
   async function carregar(silent = false) {
@@ -255,6 +257,52 @@ export default function Painel() {
   }
 
   // abre a janela de validação (não envia nada ainda)
+  // ===== Fechar o mês (substitui o "Revisto" do diretor, que agora trabalha em Excel) =====
+  async function abrirFechar() {
+    const { data: env } = await supabase.from('envios').select('id,bonus').eq('mes_referencia', sel).order('data_envio', { ascending: false }).limit(1).maybeSingle()
+    const aPagar = visiveis.reduce((s, c) => s + Math.max(0, Number(c.valor_pago || 0) - Number((c as any).pago_anterior || 0)), 0)
+    setFecho({
+      envio: env || null,
+      bonus: Number((env as any)?.bonus || 0),
+      aPagar: Math.round(aPagar * 100) / 100,
+      nLinhas: visiveis.length,
+      nPagas: visiveis.filter((c) => c.estado === 'paga').length,
+      nTransitam: visiveis.filter(emAberto).length,
+    })
+  }
+
+  async function fecharMes() {
+    if (!fecho) return
+    setFechando(true)
+    try {
+      // 1. "arruma" os pagamentos deste ciclo: o que ficou pago passa a pago_anterior,
+      //    para que as parciais que transitam não voltem a somar no mês seguinte
+      const aBancar = visiveis.filter((c) => Number(c.valor_pago || 0) > Number((c as any).pago_anterior || 0))
+      const res = await Promise.all(aBancar.map((c) =>
+        supabase.from('comissoes').update({ pago_anterior: Number(c.valor_pago || 0) }).eq('id', c.id)))
+      const erro = res.find((r: any) => r.error)
+      if (erro) throw (erro as any).error
+
+      // 2. marca o mês como concluído (ou cria o registo, se o mapa nunca foi enviado)
+      const r2 = fecho.envio
+        ? await supabase.from('envios').update({ estado: 'concluido' }).eq('id', fecho.envio.id)
+        : await supabase.from('envios').insert({
+            mes_referencia: sel, comissao_ids: visiveis.map((c) => c.id), total_comissoes: totComissao,
+            estado: 'concluido', enviado_por: def?.gestor_nome || 'Diogo Vale', enviado_para: '- (fechado no painel)',
+          })
+      if (r2.error) throw r2.error
+
+      // 3. avança para o mês seguinte
+      const proximo = nextMref(sel)
+      setFecho(null)
+      await carregar(true)
+      setSel(proximo)
+      setResultado(null)
+    } catch (e: any) {
+      alert('Erro ao fechar o mês: ' + e.message)
+    } finally { setFechando(false) }
+  }
+
   function abrirEnviar() {
     setResultado(null)
     setEnvMsg('')
@@ -290,7 +338,7 @@ export default function Painel() {
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold text-host-navy">Painel de comissões</h1>
-          {!aberto && selFechado && <span title="O diretor já reviu e concluiu este mês" className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 px-2 py-1"><IconLock className="w-3 h-3" /> concluído pelo diretor</span>}
+          {!aberto && selFechado && <span title="Mês fechado - as linhas por pagar transitaram para o seguinte" className="inline-flex items-center gap-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 px-2 py-1"><IconLock className="w-3 h-3" /> mês fechado</span>}
         </div>
         {!aberto && (
           <div className="flex items-center gap-2">
@@ -304,6 +352,12 @@ export default function Painel() {
               ↑ Importar
             </button>
             <input ref={ficheiroRef} type="file" accept=".xlsx" onChange={aoEscolherFicheiro} className="hidden" />
+            {!selFechado && (
+              <button onClick={abrirFechar} title="Fechar este mês e avançar para o seguinte"
+                className="border border-green-600 text-green-700 text-sm font-semibold rounded-lg px-3 py-2 hover:bg-green-600 hover:text-white transition-colors">
+                ✓ Fechar mês
+              </button>
+            )}
             <button onClick={abrirEnviar} className="bg-host-blue text-white text-sm font-semibold rounded-lg px-5 py-2 shadow-glow hover:bg-host-bluedark hover:-translate-y-0.5 transition-all">
               {selFechado ? 'Reenviar' : 'Enviar'}
             </button>
@@ -583,6 +637,38 @@ export default function Painel() {
                   {aplicando ? 'A aplicar…' : `Aplicar ${preview.mudancas.length + (preview.mudancaBonus ? 1 : 0)} alteração(ões)`}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Janela "Fechar mês" - resumo e confirmação */}
+      {fecho && (
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-[6vh] overflow-y-auto" onClick={() => !fechando && setFecho(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 my-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-host-navy mb-1">Fechar {mrefLabel(sel)}</h3>
+            <p className="text-sm text-gray-500 mb-4">Confirma antes de fechar. Depois o painel avança para {mrefLabel(nextMref(sel))}.</p>
+
+            <div className="rounded-xl border bg-gray-50 p-4 text-sm space-y-1.5">
+              <div className="flex justify-between"><span className="text-gray-600">Linhas no mapa</span><b className="tabular-nums">{fecho.nLinhas}</b></div>
+              <div className="flex justify-between"><span className="text-gray-600">Pagas</span><b className="tabular-nums text-green-700">{fecho.nPagas}</b></div>
+              <div className="flex justify-between"><span className="text-gray-600">Por pagar - transitam para {mrefLabel(nextMref(sel))}</span><b className="tabular-nums text-orange-600">{fecho.nTransitam}</b></div>
+              <div className="flex justify-between pt-2 mt-2 border-t"><span className="text-gray-600">Pago este mês</span><span className="tabular-nums">{eur(fecho.aPagar)}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">+ Bónus</span><span className="tabular-nums">{eur(fecho.bonus)}</span></div>
+              <div className="flex justify-between pt-2 mt-2 border-t"><b className="text-host-navy">A PAGAR - {mrefLabel(sel)}</b><b className="tabular-nums text-lg text-host-blue">{eur(fecho.aPagar + fecho.bonus)}</b></div>
+            </div>
+
+            {fecho.aPagar === 0 && fecho.bonus === 0 && (
+              <p className="text-xs text-orange-600 mt-3">⚠ Nada marcado como pago neste mês. Se ainda vais importar o Excel do diretor, faz isso primeiro.</p>
+            )}
+            <p className="text-[11px] text-gray-400 mt-3">Ao fechar, os pagamentos deste mês ficam registados, para que as linhas parciais que transitam não voltem a contar no mês seguinte.</p>
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button onClick={() => setFecho(null)} disabled={fechando} className="px-4 py-2 rounded-lg border text-sm font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50">Cancelar</button>
+              <button onClick={fecharMes} disabled={fechando}
+                className="px-5 py-2 rounded-lg bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-50">
+                {fechando ? 'A fechar…' : `Fechar ${mrefLabel(sel)}`}
+              </button>
             </div>
           </div>
         </div>
