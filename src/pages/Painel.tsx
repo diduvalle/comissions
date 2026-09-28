@@ -786,14 +786,25 @@ function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comis
   const [valor, setValor] = useState(!comissao.is_saas ? String(comissao.valor_venda) : '')
   const [pctv, setPctv] = useState(Number(comissao.percentagem))
   const [estado, setEstado] = useState<Estado>(comissao.estado)
+  const [pago, setPago] = useState(comissao.valor_pago == null ? '' : String(comissao.valor_pago))
   const [obs, setObs] = useState(comissao.observacoes || '')
   const [linkUrl, setLinkUrl] = useState('')
   const [busy, setBusy] = useState(false)
 
   const valorVenda = isSaas ? Number(mensal || 0) * 12 : Number(valor || 0)
   const com = Math.round(valorVenda * pctv) / 100
+  const devido = comissao.partilhada ? Math.round(com * 50) / 100 : com
+  const pagoAntes = Number((comissao as any).pago_anterior || 0)
+  // ao mexer no valor pago, o estado acompanha (continua editável à mão a seguir)
+  function definirPago(v: string) {
+    setPago(v)
+    const n = v === '' ? 0 : Number(v)
+    if (!isNaN(n) && n >= 0) setEstado(n > 0 && n >= devido - 0.005 ? 'paga' : n > 0 ? 'parcial' : 'pendente')
+  }
 
   async function guardar() {
+    const pagoNum = pago.trim() === '' ? null : Number(pago)
+    if (pagoNum != null && (isNaN(pagoNum) || pagoNum < 0)) { alert('O valor pago não pode ser negativo.'); return }
     setBusy(true)
     try {
       const cliente_id = await getOrCreateCliente(cliente)
@@ -801,7 +812,7 @@ function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comis
         numero_projeto: nro, data_adjudicacao: data, cliente_id, produto_id: prodId,
         valor_venda: valorVenda, percentagem: pctv, comissao_calculada: com,
         is_saas: isSaas, valor_mensal_saas: isSaas ? Number(mensal || 0) : null,
-        estado, observacoes: obs || null,
+        estado, valor_pago: pagoNum, observacoes: obs || null,
       } as any, 'gestor')
       const m = linkUrl.match(/data=(\d+)/)
       if (m) await supabase.from('projeto_links').upsert({ numero_projeto: nro, data_id: m[1] })
@@ -834,6 +845,17 @@ function EditarLinha({ comissao, produtos, clientes, onClose, onSaved }: { comis
             <select value={estado} onChange={(e) => setEstado(e.target.value as Estado)} className="mt-1 w-full border rounded px-2 py-1.5">
               {ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
+          </label>
+          <label className="col-span-2">Valor pago €
+            <div className="mt-1 flex items-center gap-2">
+              <input type="number" min="0" step="0.01" value={pago} onChange={(e) => definirPago(e.target.value)} placeholder="vazio = nada pago"
+                className="flex-1 min-w-0 border rounded px-2 py-1.5 tabular-nums" />
+              <button type="button" onClick={() => definirPago(String(devido))} title="Marcar a comissão como paga por inteiro"
+                className="shrink-0 text-xs font-semibold rounded border border-green-600 text-green-700 px-2 py-1.5 hover:bg-green-600 hover:text-white">Pagar tudo ({eur(devido)})</button>
+              <button type="button" onClick={() => definirPago('')} title="Nada pago"
+                className="shrink-0 text-xs font-semibold rounded border border-gray-300 text-gray-600 px-2 py-1.5 hover:border-red-400 hover:text-red-600">Limpar</button>
+            </div>
+            {pagoAntes > 0.005 && <span className="block text-[11px] text-gray-400 mt-1">Já pago em meses anteriores: {eur(pagoAntes)}</span>}
           </label>
           <label className="col-span-2">Observações<input value={obs} onChange={(e) => setObs(e.target.value)} className="mt-1 w-full border rounded px-2 py-1.5" /></label>
           <label className="col-span-2">Link da plataforma (cola o URL - o nº fica clicável)

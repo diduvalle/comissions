@@ -146,6 +146,17 @@ export default function Validacao() {
     patch(c, { percentagem: pct, comissao_calculada: novaCom, estado: estadoAuto(cNovo, Number(c.valor_pago || 0)) })
   }
 
+  // lê o campo "valor pago"; um valor negativo ou inválido é recusado e o campo volta ao que estava
+  function lerPago(el: HTMLInputElement, c: Comissao): number | null | undefined {
+    const v = el.value.trim() === '' ? null : Number(el.value)
+    if (v != null && (isNaN(v) || v < 0)) {
+      el.value = c.valor_pago == null ? '' : String(c.valor_pago)
+      flash('⚠ O valor pago não pode ser negativo')
+      return undefined
+    }
+    return v
+  }
+
   function setPago(c: Comissao, v: number | null) {
     patch(c, { valor_pago: v, estado: estadoAuto(c, Number(v || 0)) })
   }
@@ -303,8 +314,8 @@ export default function Validacao() {
                 </div>
                 <div className="flex items-center gap-2 mb-2">
                   <label className="text-xs text-gray-500">Pago</label>
-                  <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="-" inputMode="decimal"
-                    onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
+                  <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" min="0" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="-" inputMode="decimal"
+                    onBlur={(e) => { const v = lerPago(e.target, c); if (v !== undefined && v !== (c.valor_pago ?? null)) setPago(c, v) }}
                     className="flex-1 min-w-0 text-right border rounded px-2 py-1.5" />
                   <button onClick={() => pagarComissao(c)} title="Pagar a comissão toda" className="shrink-0 bg-green-600 text-white text-sm font-semibold rounded px-3 py-1.5">✓ Pagar</button>
                 </div>
@@ -371,9 +382,9 @@ export default function Validacao() {
                   </td>
                   <td className="px-1.5 py-1.5">
                     <div className="flex items-center gap-1">
-                      <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="-"
+                      <input key={`${c.id}-${c.valor_pago ?? ''}`} type="number" min="0" step="0.01" defaultValue={c.valor_pago ?? ''} placeholder="-"
                         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                        onBlur={(e) => { const v = e.target.value === '' ? null : Number(e.target.value); if (v !== (c.valor_pago ?? null)) setPago(c, v) }}
+                        onBlur={(e) => { const v = lerPago(e.target, c); if (v !== undefined && v !== (c.valor_pago ?? null)) setPago(c, v) }}
                         className="w-full min-w-0 text-right tabular-nums border rounded px-1 py-1" />
                       <button onClick={() => pagarComissao(c)} title="Pagar a comissão toda (1 clique)"
                         className="shrink-0 text-green-600 hover:text-white hover:bg-green-600 border border-green-600 rounded px-1 py-1 text-[11px] font-bold transition-colors">✓</button>

@@ -171,12 +171,12 @@ export type LeituraExcel = { linhas: LinhaLida[]; bonus: number | null; totalFic
 function lerValor(v: any): number | 'PAGO' | null {
   if (v == null || v === '') return null
   if (typeof v === 'object' && v.result != null) v = v.result // célula com fórmula
-  if (typeof v === 'number') return v
+  if (typeof v === 'number') return v < 0 ? null : v // nunca há pagamentos negativos
   const s = String(v).trim()
   if (!s) return null
   if (/^pago$/i.test(s)) return 'PAGO'
   const n = Number(s.replace(/[€\s]/g, '').replace(/\./g, '').replace(',', '.'))
-  return isNaN(n) ? null : n
+  return isNaN(n) || n < 0 ? null : n
 }
 
 function texto(v: any): string {
