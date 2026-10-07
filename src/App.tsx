@@ -8,12 +8,15 @@ import Envios from './pages/Envios'
 import Emails from './pages/Emails'
 import Validacao from './pages/Validacao'
 import VerEnvio from './pages/VerEnvio'
+import Relatorio from './pages/Relatorio'
 
 export default function App() {
   return (
     <Routes>
       <Route path="/validacao/:token" element={<Validacao />} />
       <Route path="/ver/:token" element={<VerEnvio />} />
+      {/* relatório A4 para guardar em PDF: protegido por PIN, sem a navegação da app */}
+      <Route path="/relatorio" element={<PinGate><Relatorio /></PinGate>} />
       <Route
         path="/"
         element={

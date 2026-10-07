@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../supabase'
 import type { Comissao, Envio } from '../types'
 import { eur, parseMref, MESES } from '../utils'
+import VendasPainel from './Vendas'
+import { COR_PONTUAL } from '../vendas'
 
 const COR_REC = '#0667FF' // recorrente (SaaS) - azul Host
-const COR_PON = '#cbd5e1' // pontual (Setup/Serviços) - cinza claro
+// pontual: violeta validado (o cinzento antigo lia-se como "desativado" e o texto branco não se via)
+const COR_PON = COR_PONTUAL
 
 function pctTxt(n: number) { return `${n > 0 ? '+' : ''}${n.toFixed(0)}%` }
 
@@ -15,6 +18,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
   const [metas, setMetas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [ano, setAno] = useState<number>(0)
+  const [vista, setVista] = useState<'comissoes' | 'vendas'>('comissoes')
 
   async function carregar() {
     const [{ data: c }, { data: e }, { data: pv }] = await Promise.all([
@@ -188,6 +192,18 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
         </div>
       </div>
 
+      {!publico && (
+        <div className="flex gap-1 mb-4 no-print">
+          {(['comissoes', 'vendas'] as const).map((k) => (
+            <button key={k} onClick={() => setVista(k)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold ${vista === k ? 'bg-host-navy text-white' : 'bg-white border text-host-navy hover:bg-gray-50'}`}>
+              {k === 'comissoes' ? 'Comissões' : 'Vendas'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!publico && vista === 'vendas' ? <VendasPainel comissoes={comissoes} ano={ano} /> : (<>
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         <Card label={`Comissão ganha (${ano})`} valor={eur(totComissao)}
@@ -230,7 +246,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
           <h3 className="font-semibold text-host-navy">Recorrente vs Pontual</h3>
           <span className="text-xs text-gray-500">previsibilidade do teu rendimento</span>
         </div>
-        <div className="flex h-6 w-full rounded-lg overflow-hidden text-[11px] font-semibold text-white">
+        <div className="flex h-6 w-full gap-[2px] rounded-lg overflow-hidden text-[11px] font-semibold text-white">
           <div style={{ width: `${recPct}%`, background: COR_REC }} className="flex items-center justify-center" title={`Recorrente ${eur(recorrente)}`}>{recPct >= 12 ? `${recPct.toFixed(0)}%` : ''}</div>
           <div style={{ width: `${100 - recPct}%`, background: COR_PON }} className="flex items-center justify-center" title={`Pontual ${eur(pontual)}`}>{(100 - recPct) >= 12 ? `${(100 - recPct).toFixed(0)}%` : ''}</div>
         </div>
@@ -394,6 +410,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
       </div>
 
       <p className="text-xs text-gray-400 mt-4">{doAno.length} projeto(s) em {ano}.</p>
+      </>)}
     </div>
   )
 }
