@@ -58,23 +58,61 @@ export default function Relatorio() {
     `, e as vendas pontuais somaram ${eur(A.pontual)}.`,
   ].join('')
 
+  const TOTAL_PAGINAS = 3
+  const nome = def?.gestor_nome || ''
+
+  // Cada página é uma folha A4 explícita, com as margens DENTRO dela.
+  // Assim o PDF sai igual seja qual for a opção "Margens" do diálogo de impressão
+  // (Predefinição, Mínimas ou Nenhuma), e com margem de página 0 o browser deixa de
+  // acrescentar os cabeçalhos/rodapés dele (URL, data) - usamos os nossos.
+  const Folha = ({ n, children }: { n: number; children: React.ReactNode }) => (
+    <section className="folha text-host-navy">
+      {n > 1 && (
+        <div className="flex items-center justify-between text-[10px] text-gray-500 pb-2 mb-4 border-b border-gray-200">
+          <span><b className="text-host-navy">Relatório de desempenho comercial</b> · {nome}</span>
+          <span>{periodo} {ano}</span>
+        </div>
+      )}
+      <div className="flex-1 min-h-0">{children}</div>
+      <div className="flex items-center justify-between text-[9.5px] text-gray-400 pt-2 mt-3 border-t border-gray-200">
+        <span>Host Hotel Systems · Move beyond expectations.</span>
+        <span>página {n} de {TOTAL_PAGINAS}</span>
+      </div>
+    </section>
+  )
+
   return (
-    <div className="min-h-screen bg-gray-100 print:bg-white">
+    <div className="min-h-screen bg-gray-200 print:bg-white">
+      <style>{`
+        @page { size: A4; margin: 0; }
+        .folha { width: 210mm; height: 297mm; padding: 13mm 14mm 9mm; box-sizing: border-box;
+                 display: flex; flex-direction: column; background: #fff; overflow: hidden;
+                 margin: 0 auto 8mm; box-shadow: 0 6px 24px rgba(15,30,46,.14); }
+        @media print {
+          html, body { background: #fff !important; }
+          /* na impressão a folha ocupa a área que o diálogo der (100vh = altura imprimível),
+             por isso não se parte em duas se alguém escolher margens "Mínimas" */
+          .folha { width: 100%; height: 100vh; margin: 0; box-shadow: none; break-after: page; }
+          .folha:last-of-type { break-after: auto; }
+        }
+      `}</style>
+
       {/* barra de ações (não sai no PDF) */}
-      <div className="no-print sticky top-0 z-10 bg-host-navy text-white">
+      <div className="no-print sticky top-0 z-10 bg-host-navy text-white mb-6">
         <div className="max-w-[210mm] mx-auto px-4 py-2.5 flex items-center gap-3">
-          <span className="text-sm font-semibold">Relatório de desempenho {ano}</span>
-          <span className="text-xs text-white/60 hidden sm:inline">No ecrã de impressão, escolhe <b>"Guardar como PDF"</b> no destino.</span>
-          <button onClick={() => window.print()} className="ml-auto bg-white text-host-navy text-sm font-semibold rounded-lg px-4 py-1.5 hover:bg-gray-100">
+          <span className="text-sm font-semibold whitespace-nowrap">Relatório de desempenho {ano}</span>
+          <span className="text-xs text-white/60 hidden md:inline truncate">No ecrã de impressão, escolhe <b>"Guardar como PDF"</b> no destino.</span>
+          <button onClick={() => window.print()} className="ml-auto shrink-0 whitespace-nowrap bg-white text-host-navy text-sm font-semibold rounded-lg px-4 py-1.5 hover:bg-gray-100">
             Guardar PDF
           </button>
           <button onClick={() => window.close()} className="text-sm text-white/70 hover:text-white">Fechar</button>
         </div>
       </div>
 
-      <div className="relatorio max-w-[210mm] mx-auto bg-white shadow-elevated print:shadow-none my-6 print:my-0 px-[12mm] py-[12mm] print:p-0 text-host-navy">
+      <div className="relatorio">
+      <Folha n={1}>
         {/* ===== Capa / cabeçalho ===== */}
-        <div className="flex items-start justify-between gap-6 pb-5 border-b-2 border-host-navy">
+        <div className="flex items-start justify-between gap-6 pb-4 border-b-2 border-host-navy">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.15em] text-host-blue">Relatório de desempenho comercial</div>
             <div className="text-[26px] font-bold leading-tight mt-1">{def?.gestor_nome}</div>
@@ -82,7 +120,7 @@ export default function Relatorio() {
           </div>
           <img src="/host-color.png" alt="Host Hotel Systems" className="h-9 mt-1" />
         </div>
-        <div className="flex flex-wrap justify-between gap-2 text-xs text-gray-600 mt-3 mb-5">
+        <div className="flex flex-wrap justify-between gap-2 text-xs text-gray-600 mt-3 mb-4">
           <span>Período: <b className="text-host-navy">{periodo} {ano}</b>{p.emCurso && <> · comparado com o mesmo período de {anoAnt}</>}</span>
           <span>Emitido em {hoje}</span>
         </div>
@@ -101,19 +139,22 @@ export default function Relatorio() {
             <Kpi label="Valor total vendido" valor={eur(A.total)}
               sub={<><Var a={A.total} b={B.total} /><div className="text-gray-500">{anoAnt}: {eur(B.total)}</div></>} />
           </div>
-          <div className="grid grid-cols-3 gap-2.5 text-xs mb-6">
+          <div className="grid grid-cols-3 gap-2.5 text-xs mb-5">
             <div className="rounded-lg bg-gray-50 px-3 py-2"><span className="text-gray-500">Nº de vendas</span><div className="text-base font-bold tabular-nums">{A.n} <span className="text-xs font-normal"><Var a={A.n} b={B.n} /></span></div></div>
             <div className="rounded-lg bg-gray-50 px-3 py-2"><span className="text-gray-500">Valor médio por venda</span><div className="text-base font-bold tabular-nums">{eur(ticketA)}</div></div>
             <div className="rounded-lg bg-gray-50 px-3 py-2"><span className="text-gray-500">Novo MRR acumulado (histórico)</span><div className="text-base font-bold tabular-nums" style={{ color: COR_SAAS }}>{eur(acumulado)}/mês</div></div>
           </div>
         </div>
 
-        <div className="break-inside-avoid mb-6">
-          <GraficoMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} soPeriodo parcialAnt={v.parcialAnt} />
+        <div className="mb-5">
+          <GraficoMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} soPeriodo parcialAnt={v.parcialAnt} altura="h-36" />
         </div>
+        <GraficoMrrAcumulado dados={v.acumulado} altura="h-28" />
+      </Folha>
 
-        {/* ===== Página 2: detalhe ===== */}
-        <div className="break-before-page">
+      {/* ===== Página 2: detalhe ===== */}
+      <Folha n={2}>
+        <div>
           <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-2">Mês a mês</h2>
           <div className="break-inside-avoid mb-6">
             <TabelaMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} A={A} B={B} periodo={periodo} parcialAnt={v.parcialAnt} diaFim={v.diaFim} />
@@ -122,7 +163,7 @@ export default function Relatorio() {
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div className="break-inside-avoid">
               <ListaBarras titulo="Por produto"
-                itens={v.produtosA.map((x) => ({ nome: x.tipo, total: x.total, cor: x.saas ? COR_SAAS : COR_PONTUAL, detalhe: `${x.n}` }))}
+                itens={v.produtosA.slice(0, 8).map((x) => ({ nome: x.tipo, total: x.total, cor: x.saas ? COR_SAAS : COR_PONTUAL, detalhe: `${x.n}` }))}
               />
               <p className="text-[10px] text-gray-500 mt-2 leading-snug">{"Desde dez/2025, Setup Fee e SaaS > 24 passaram a ser registados à parte (antes contavam como Serviços e SaaS < 24). Por isso não se compara produto a produto com anos anteriores; a comparação válida é pontual vs recorrente."}</p>
             </div>
@@ -132,12 +173,13 @@ export default function Relatorio() {
             </div>
           </div>
         </div>
+      </Folha>
 
-        {/* ===== Página 3: tendência ===== */}
-        <div className="break-before-page">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">Tendência</h2>
-          <div className="break-inside-avoid mb-6"><GraficoMrrAcumulado dados={v.acumulado} /></div>
-          <div className="break-inside-avoid mb-6"><MixPorAno dados={v.mixAnos} anoAtual={ano} /></div>
+      {/* ===== Página 3: tendência, comissões e notas ===== */}
+      <Folha n={3}>
+        <div>
+          <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">Tendência e comissões</h2>
+          <div className="mb-6"><MixPorAno dados={v.mixAnos} anoAtual={ano} /></div>
 
           <div className="break-inside-avoid mb-6 rounded-xl border p-4">
             <h3 className="font-semibold mb-2">Comissões geradas no período</h3>
@@ -159,9 +201,9 @@ export default function Relatorio() {
               <li><b>Novo MRR acumulado</b> soma as mensalidades vendidas desde o início do registo e não desconta cancelamentos.</li>
               <li><b>Arredondamentos:</b> os valores são apresentados ao euro; a soma das linhas pode diferir do total em ±1 €.</li>
             </ul>
-            <div className="mt-3 text-gray-400">Host Hotel Systems · Move beyond expectations.</div>
           </div>
         </div>
+      </Folha>
       </div>
     </div>
   )

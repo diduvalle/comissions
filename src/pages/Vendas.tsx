@@ -79,9 +79,10 @@ function Legenda({ itens }: { itens: { cor: string; texto: string }[] }) {
 }
 
 /** valor vendido por mês: ano em análise vs ano anterior (barras emparelhadas, eixo único) */
-export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo = false, parcialAnt = null }: {
+export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo = false, parcialAnt = null, altura = 'h-44' }: {
   mesesA: Metricas[]; mesesB: Metricas[]; ano: number; mesFim: number; emCurso: boolean
   soPeriodo?: boolean; parcialAnt?: Metricas | null // relatório: só o período comparável (igual à tabela)
+  altura?: string
 }) {
   // valor do ano anterior a desenhar em cada mês: no relatório, o mês em curso conta só os mesmos dias
   // e os meses seguintes não aparecem, para o gráfico bater certo com a tabela e com o total
@@ -97,7 +98,7 @@ export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo 
         <h3 className="font-semibold text-host-navy">Valor vendido por mês</h3>
         <Legenda itens={[{ cor: COR_ANTERIOR, texto: String(ano - 1) }, { cor: COR_SAAS, texto: String(ano) }]} />
       </div>
-      <div className="relative h-44">
+      <div className={`relative ${altura}`}>
         {/* grelha recessiva: 50% e 100% do máximo */}
         {[0.5, 1].map((f) => (
           <div key={f} className="absolute left-0 right-0 border-t border-dashed border-gray-200" style={{ bottom: `${f * 100}%` }}>
@@ -179,7 +180,7 @@ export function TabelaMensal({ mesesA, mesesB, ano, mesFim, emCurso, A, B, perio
 }
 
 /** novo MRR acumulado ao longo do tempo (uma série: o título identifica-a, sem caixa de legenda) */
-export function GraficoMrrAcumulado({ dados }: { dados: { ano: number; mes: number; novo: number; acumulado: number }[] }) {
+export function GraficoMrrAcumulado({ dados, altura = 'h-44' }: { dados: { ano: number; mes: number; novo: number; acumulado: number }[]; altura?: string }) {
   if (dados.length < 2) return <p className="text-sm text-gray-400">Sem histórico suficiente.</p>
   const W = 600, H = 170, padT = 12, padB = 4
   const max = Math.max(1, ...dados.map((d) => d.acumulado))
@@ -194,7 +195,7 @@ export function GraficoMrrAcumulado({ dados }: { dados: { ano: number; mes: numb
         <span className="text-sm text-gray-600">hoje: <b className="tabular-nums" style={{ color: COR_SAAS }}>{eur(ult.acumulado)}/mês</b></span>
       </div>
       <p className="text-[11px] text-gray-500 mb-2">Soma da receita recorrente mensal que vendeste desde {MESES[dados[0].mes - 1].toLowerCase()} {dados[0].ano}. Não desconta cancelamentos.</p>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-44 overflow-visible" preserveAspectRatio="none">
+      <svg viewBox={`0 0 ${W} ${H}`} className={`w-full ${altura} overflow-visible`} preserveAspectRatio="none">
         <style>{`.col:hover .cruz{opacity:1}`}</style>
         {[0.5, 1].map((f) => <line key={f} x1="0" x2={W} y1={y(max * f)} y2={y(max * f)} stroke="#e5e7eb" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />)}
         <polygon points={`0,${H} ${pts} ${W},${H}`} fill={COR_SAAS} opacity="0.10" />
