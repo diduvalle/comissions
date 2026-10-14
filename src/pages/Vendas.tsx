@@ -19,7 +19,10 @@ export function textoPeriodo(ano: number) {
 }
 
 /** todas as contas de uma vez (o painel e o relatório chamam isto) */
-export function calcularVendas(comissoes: Comissao[], ano: number) {
+export function calcularVendas(todas: Comissao[], ano: number) {
+  // vendas canceladas não contam como vendas: saem de todas as contas e são mostradas à parte
+  const comissoes = todas.filter((c) => !c.cancelada)
+  const canceladas = todas.filter((c) => c.cancelada)
   const p = periodoComparavel(ano)
   const linhasA = noPeriodo(comissoes, p.atual.de, p.atual.ate)
   const linhasB = noPeriodo(comissoes, p.anterior.de, p.anterior.ate)
@@ -28,6 +31,9 @@ export function calcularVendas(comissoes: Comissao[], ano: number) {
   const anos = [...new Set(comissoes.map((c) => Number(c.data_adjudicacao?.slice(0, 4))).filter(Boolean))].sort()
   return {
     p, A, B, linhasA, linhasB,
+    // o que saiu deste período por ter sido cancelado (pela data da venda)
+    canceladasA: metricas(noPeriodo(canceladas, p.atual.de, p.atual.ate)),
+    canceladasB: metricas(noPeriodo(canceladas, p.anterior.de, p.anterior.ate)),
     mesesA: porMes(comissoes, ano),
     mesesB: porMes(comissoes, ano - 1),
     produtosA: porProduto(linhasA),
@@ -194,7 +200,7 @@ export function GraficoMrrAcumulado({ dados, altura = 'h-44' }: { dados: { ano: 
         <h3 className="font-semibold text-host-navy">Novo MRR acumulado</h3>
         <span className="text-sm text-gray-600">hoje: <b className="tabular-nums" style={{ color: COR_SAAS }}>{eur(ult.acumulado)}/mês</b></span>
       </div>
-      <p className="text-[11px] text-gray-500 mb-2">Soma da receita recorrente mensal que vendeste desde {MESES[dados[0].mes - 1].toLowerCase()} {dados[0].ano}. Não desconta cancelamentos.</p>
+      <p className="text-[11px] text-gray-500 mb-2">Soma da receita recorrente mensal que vendeste desde {MESES[dados[0].mes - 1].toLowerCase()} {dados[0].ano}. Exclui as vendas registadas como canceladas.</p>
       <svg viewBox={`0 0 ${W} ${H}`} className={`w-full ${altura} overflow-visible`} preserveAspectRatio="none">
         <style>{`.col:hover .cruz{opacity:1}`}</style>
         {[0.5, 1].map((f) => <line key={f} x1="0" x2={W} y1={y(max * f)} y2={y(max * f)} stroke="#e5e7eb" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />)}
@@ -291,6 +297,7 @@ export default function VendasPainel({ comissoes, ano }: { comissoes: Comissao[]
       <div className="flex flex-wrap items-end justify-between gap-2 mb-3">
         <p className="text-sm text-gray-600">
           Vendas pela <b>data da venda</b> · {periodo} {ano}, comparado com o {ref}.
+          {v.canceladasA.n > 0 && <span className="ml-2 text-gray-500">· ⊘ {v.canceladasA.n} venda(s) cancelada(s) neste período ({eur(v.canceladasA.total)}) não contam.</span>}
         </p>
         <button onClick={() => window.open(`/relatorio?ano=${ano}`, '_blank')}
           className="no-print px-4 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold shadow-glow hover:bg-host-bluedark">

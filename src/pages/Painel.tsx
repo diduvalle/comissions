@@ -92,14 +92,16 @@ export default function Painel() {
 
   const selOrder = sel ? parseMref(sel).order : 0
   // "aberta" = por pagar E não finalizada (finalizada = fechada manualmente, não transita)
-  const emAberto = (c: Comissao) => c.estado !== 'paga' && !c.finalizada
+  // cancelada também não transita: a comissão ainda por pagar deixa de ser devida
+  const emAberto = (c: Comissao) => c.estado !== 'paga' && !c.finalizada && !c.cancelada
   const proprias = comissoes.filter((c) => c.mes_referencia === sel)
   const transitadas = comissoes.filter((c) => emAberto(c) && parseMref(c.mes_referencia).order < selOrder)
   const visiveis = aberto
     ? comissoes.filter((c) => emAberto(c))
     : [...transitadas, ...proprias]
 
-  const totComissao = visiveis.reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
+  const comEfetiva = (c: Comissao) => (c.cancelada ? Number(c.valor_pago || 0) : Number(c.comissao_calculada || 0))
+  const totComissao = visiveis.reduce((s, c) => s + comEfetiva(c), 0)
   // "Pago" = só o que é pago neste ciclo (exclui parciais já pagas em meses anteriores)
   const totPago = visiveis.reduce((s, c) => s + Math.max(0, Number(c.valor_pago || 0) - Number((c as any).pago_anterior || 0)), 0)
   const porPagar = visiveis.filter((c) => emAberto(c)).reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
@@ -456,12 +458,14 @@ export default function Painel() {
             {visiveisF.map((c) => {
               const trans = c.mes_referencia !== sel || aberto
               return (
-                <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
+                <tr key={c.id} className={`border-b last:border-0 hover:bg-gray-50 ${c.cancelada ? 'opacity-50 line-through decoration-gray-400' : ''}`}
+                  title={c.cancelada ? `Cancelada em ${fmtDate(c.cancelada_em || '')}${c.motivo_cancelamento ? ' - ' + c.motivo_cancelamento : ''}` : undefined}>
                   <td className="px-2 py-1.5 truncate" title="Duplo-clique para definir/editar o link da plataforma" onDoubleClick={() => definirLink(c)}>
                     {links[c.numero_projeto]
                       ? <a href={platformUrl(links[c.numero_projeto])} target="_blank" rel="noreferrer" className="text-host-blue hover:underline">{c.numero_projeto}</a>
                       : <span className="border-b border-dashed border-gray-300 cursor-pointer">{c.numero_projeto}</span>}
                     {trans && <span className="ml-1 text-[9px] uppercase bg-amber-100 text-amber-700 px-1 py-0.5 rounded" title={`transitada de ${mrefLabel(c.mes_referencia)}`}>↪{parseMref(c.mes_referencia).year % 100}</span>}
+                    {c.cancelada && <span className="ml-1 text-[9px] uppercase bg-gray-200 text-gray-600 px-1 py-0.5 rounded no-underline inline-block">cancelada</span>}
                   </td>
                   <td className="px-2 py-1.5 whitespace-nowrap">{fmtDate(c.data_adjudicacao)}</td>
                   <td className="px-2 py-1.5 truncate" title={c.cliente?.nome}>{c.cliente?.nome}</td>
@@ -728,6 +732,7 @@ export default function Painel() {
 const CAMPO_LABEL: Record<string, string> = {
   valor_pago: 'Valor pago', comissao_calculada: 'Comissão', percentagem: 'Percentagem',
   estado: 'Estado', observacoes: 'Observações', valor_venda: 'Valor da venda',
+  cancelada: 'Cancelada', cancelada_em: 'Cancelada em', motivo_cancelamento: 'Motivo do cancelamento',
 }
 
 function HistoricoLinha({ comissao, onClose }: { comissao: Comissao; onClose: () => void }) {

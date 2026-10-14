@@ -26,7 +26,9 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
       supabase.from('envios').select('*'),
       supabase.from('projeto_valores').select('numero_projeto,setup,saas_mes,cliente,marca'),
     ])
-    setComissoes((c as any) || [])
+    // venda cancelada: a comissão conta só o que já foi pago (fica como histórico) e deixa de estar pendente.
+    // A marca "cancelada" mantém-se, para a secção de Vendas a excluir.
+    setComissoes(((c as any) || []).map((x: any) => (x.cancelada ? { ...x, comissao_calculada: Number(x.valor_pago || 0), estado: 'paga' } : x)))
     setEnvios((e as any) || [])
     setProjetoValores((pv as any) || [])
     const { data: mt } = await supabase.from('metas').select('*') // pode não existir ainda

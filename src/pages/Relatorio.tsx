@@ -198,7 +198,8 @@ export default function Relatorio() {
               <li><b>Data:</b> cada venda conta no mês da sua data de adjudicação.</li>
               {p.emCurso && <li><b>Comparação justa:</b> o ano em curso ({periodo} {ano}) é comparado com o mesmo intervalo de dias de {anoAnt}, nunca com o ano completo. O mês em curso não é comparado, por estar incompleto.</li>}
               <li><b>SaaS:</b> "novo MRR" é a mensalidade das novas subscrições vendidas; "anualizado" = mensalidade × 12. <b>Valor total vendido</b> = vendas pontuais + SaaS anualizado (valor do primeiro ano).</li>
-              <li><b>Novo MRR acumulado</b> soma as mensalidades vendidas desde o início do registo e não desconta cancelamentos.</li>
+              <li><b>Vendas canceladas:</b> não contam em nenhum valor deste relatório, incluindo o MRR acumulado.{v.canceladasA.n > 0 ? ` No período foram excluídas ${v.canceladasA.n} venda(s), num total de ${eur(v.canceladasA.total)}.` : ' Não há vendas canceladas registadas no período.'}</li>
+              <li><b>Novo MRR acumulado</b> soma as mensalidades vendidas desde o início do registo; só desconta os cancelamentos registados na aplicação.</li>
               <li><b>Arredondamentos:</b> os valores são apresentados ao euro; a soma das linhas pode diferir do total em ±1 €.</li>
             </ul>
           </div>

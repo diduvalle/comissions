@@ -27,7 +27,9 @@ export default {
         'fade-up': { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'none' } },
       },
       animation: {
-        'fade-up': 'fade-up .45s cubic-bezier(.21,.6,.35,1) both',
+        // 'backwards' (e não 'both'): com 'both' a animação ficava em vigor para sempre e as janelas
+        // 'fixed' posicionavam-se relativamente ao conteúdo, podendo ficar fora do ecrã em páginas longas
+        'fade-up': 'fade-up .45s cubic-bezier(.21,.6,.35,1) backwards',
       },
     },
   },

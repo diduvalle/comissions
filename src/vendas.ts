@@ -90,7 +90,8 @@ export function porCliente(linhas: Comissao[]) {
   return Object.entries(g).map(([nome, ls]) => ({ nome, ...metricas(ls) })).sort((a, b) => b.total - a.total)
 }
 
-/** novo MRR acumulado mês a mês, desde a primeira venda até ao mês indicado (não desconta cancelamentos) */
+/** novo MRR acumulado mês a mês, desde a primeira venda até ao mês indicado.
+ *  Recebe só as vendas ativas: as canceladas registadas já não entram. */
 export function mrrAcumulado(linhas: Comissao[], ateAno: number, ateMes: number) {
   const datas = linhas.map((c) => c.data_adjudicacao).filter(Boolean).sort()
   if (!datas.length) return []

@@ -22,6 +22,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <img src="/host-color.png" alt="Host" className="h-7 shrink-0" />
           <nav className="flex items-center gap-1 shrink-0">
             {tab('/', 'Painel')}
+            {tab('/negocios', 'Negócios')}
             {tab('/resumo', 'Analytics')}
             {tab('/envios', 'Envios')}
             {tab('/emails', 'Emails')}

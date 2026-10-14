@@ -78,7 +78,7 @@ export default function VerEnvio() {
         supabase.from('comissoes').select('*, cliente:clientes(*), produto:produtos(*)').in('id', (e as any).comissao_ids),
       ])
       setDef(d as any)
-      setLinhas([...((c as any) || [])].sort(porNumero))
+      setLinhas([...((c as any) || [])].filter((x: any) => !x.cancelada).sort(porNumero))
       const nums = [...new Set((((c as any) || []) as any[]).map((x) => String(x.numero_projeto)))]
       const { data: lk } = await supabase.from('projeto_links').select('numero_projeto,data_id').in('numero_projeto', nums.length ? nums : ['__none__'])
       setLinks(Object.fromEntries(((lk as any) || []).map((x: any) => [x.numero_projeto, x.data_id])))

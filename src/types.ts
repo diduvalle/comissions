@@ -31,6 +31,10 @@ export interface Comissao {
   pago_anterior?: number | null
   partilhada: boolean
   finalizada: boolean
+  // venda cancelada: deixa de contar como venda e de transitar; o que foi pago fica como histórico
+  cancelada?: boolean
+  cancelada_em?: string | null
+  motivo_cancelamento?: string | null
   observacoes: string | null
   mes_referencia: string
   created_at?: string

@@ -9,6 +9,7 @@ import Emails from './pages/Emails'
 import Validacao from './pages/Validacao'
 import VerEnvio from './pages/VerEnvio'
 import Relatorio from './pages/Relatorio'
+import Negocios from './pages/Negocios'
 
 export default function App() {
   return (
@@ -23,6 +24,16 @@ export default function App() {
           <PinGate>
             <Layout>
               <Painel />
+            </Layout>
+          </PinGate>
+        }
+      />
+      <Route
+        path="/negocios"
+        element={
+          <PinGate>
+            <Layout>
+              <Negocios />
             </Layout>
           </PinGate>
         }
