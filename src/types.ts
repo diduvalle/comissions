@@ -35,6 +35,7 @@ export interface Comissao {
   cancelada?: boolean
   cancelada_em?: string | null
   motivo_cancelamento?: string | null
+  valor_realizado?: number | null // venda cancelada: quanto o cliente chegou a pagar desta linha
   observacoes: string | null
   mes_referencia: string
   created_at?: string

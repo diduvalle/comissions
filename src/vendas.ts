@@ -23,8 +23,16 @@ const r2 = (n: number) => Math.round(n * 100) / 100
 const fmt0 = new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0, minimumFractionDigits: 0 })
 export const eur0 = (n: number) => fmt0.format(Math.round(Number(n) || 0))
 
+// Valor de venda que conta nas estatísticas. Numa venda cancelada conta só o que o cliente
+// chegou a pagar (nunca mais do que o próprio valor da venda); o resto do contrato sai.
+export function valorContado(c: Comissao): number {
+  const v = Number(c.valor_venda || 0)
+  return c.cancelada ? Math.min(Math.max(0, Number(c.valor_realizado || 0)), v) : v
+}
+
 export function mensalidade(c: Comissao): number {
-  if (!c.is_saas) return 0
+  // subscrição cancelada já não é receita recorrente, mesmo que tenha havido pagamentos
+  if (!c.is_saas || c.cancelada) return 0
   const m = Number(c.valor_mensal_saas || 0)
   return m > 0 ? m : Number(c.valor_venda || 0) / 12
 }
@@ -32,16 +40,29 @@ export function mensalidade(c: Comissao): number {
 export function metricas(linhas: Comissao[]): Metricas {
   let pontual = 0, mrr = 0, anual = 0, comissao = 0
   const proj = new Set<string>()
+  let n = 0
   for (const c of linhas) {
-    proj.add(String(c.numero_projeto))
-    comissao += Number(c.comissao_calculada || 0)
-    if (c.is_saas) { mrr += mensalidade(c); anual += Number(c.valor_venda || 0) }
-    else pontual += Number(c.valor_venda || 0)
+    // uma venda cancelada não conta como venda, mas o que o cliente pagou conta como valor
+    if (!c.cancelada) { n++; proj.add(String(c.numero_projeto)) }
+    // comissão de uma venda cancelada = a que foi efetivamente paga
+    comissao += c.cancelada ? Number(c.valor_pago || 0) : Number(c.comissao_calculada || 0)
+    if (c.is_saas) { mrr += mensalidade(c); anual += valorContado(c) }
+    else pontual += valorContado(c)
   }
   return {
-    n: linhas.length, projetos: proj.size,
+    n, projetos: proj.size,
     pontual: r2(pontual), mrr: r2(mrr), anual: r2(anual), total: r2(pontual + anual), comissao: r2(comissao),
   }
+}
+
+/** vendas canceladas de um conjunto: nº, valor do contrato, o que foi pago e o que saiu das estatísticas */
+export function resumoCanceladas(linhas: Comissao[]) {
+  const ls = linhas.filter((c) => c.cancelada)
+  const contrato = ls.reduce((s, c) => s + Number(c.valor_venda || 0), 0)
+  const realizado = ls.reduce((s, c) => s + valorContado(c), 0)
+  // um negócio (nº de projeto) pode ter várias linhas canceladas: conta-se o negócio, não as linhas
+  const negocios = new Set(ls.map((c) => String(c.numero_projeto))).size
+  return { n: ls.length, negocios, contrato: r2(contrato), realizado: r2(realizado), excluido: r2(contrato - realizado) }
 }
 
 /** linhas com data de venda entre de e ate (ISO 'AAAA-MM-DD', inclusive) */

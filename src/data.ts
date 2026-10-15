@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import type { Comissao } from './types'
 
-const TRACK: (keyof Comissao)[] = ['valor_pago', 'comissao_calculada', 'percentagem', 'estado', 'observacoes', 'valor_venda', 'cancelada', 'cancelada_em', 'motivo_cancelamento']
+const TRACK: (keyof Comissao)[] = ['valor_pago', 'comissao_calculada', 'percentagem', 'estado', 'observacoes', 'valor_venda', 'cancelada', 'cancelada_em', 'motivo_cancelamento', 'valor_realizado']
 
 // Atualiza uma comissão e regista no histórico cada campo alterado.
 export async function updateComissao(

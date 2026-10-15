@@ -6,7 +6,7 @@ import { supabase } from '../supabase'
 import type { Comissao } from '../types'
 import { fmtDate, platformUrl } from '../utils'
 import { updateComissao } from '../data'
-import { metricas, eur0 as eur } from '../vendas'
+import { metricas, resumoCanceladas, eur0 as eur } from '../vendas'
 
 type Negocio = {
   nr: string
@@ -34,6 +34,7 @@ export default function Negocios() {
   const [sel, setSel] = useState<Record<string, boolean>>({})
   const [dataCanc, setDataCanc] = useState(hoje())
   const [motivo, setMotivo] = useState('')
+  const [realizados, setRealizados] = useState<Record<string, string>>({}) // por linha: quanto o cliente chegou a pagar
   const [aGravar, setAGravar] = useState(false)
   const [msg, setMsg] = useState('')
 
@@ -49,7 +50,7 @@ export default function Negocios() {
   useEffect(() => { carregar() }, [])
 
   // sem o SQL corrido, as linhas não trazem o campo "cancelada"
-  const falta_sql = comissoes.length > 0 && !('cancelada' in comissoes[0])
+  const falta_sql = comissoes.length > 0 && !('cancelada' in comissoes[0] && 'valor_realizado' in comissoes[0])
 
   const negocios = useMemo<Negocio[]>(() => {
     const g: Record<string, Comissao[]> = {}
@@ -63,7 +64,7 @@ export default function Negocios() {
         data: linhas.map((c) => c.data_adjudicacao).filter(Boolean).sort()[0] || '',
         linhas, ativas, canceladas,
         estado: canceladas.length === 0 ? 'ativo' : ativas.length === 0 ? 'cancelado' : 'parcial',
-        vendido: metricas(ativas),
+        vendido: metricas(linhas),
         // comissão de uma linha cancelada = o que já foi pago; o resto deixou de ser devido
         comissao: linhas.reduce((s, c) => s + (c.cancelada ? Number(c.valor_pago || 0) : Number(c.comissao_calculada || 0)), 0),
         pago: linhas.reduce((s, c) => s + Number(c.valor_pago || 0), 0),
@@ -82,12 +83,12 @@ export default function Negocios() {
   })
   const totVendido = visiveis.reduce((s, n) => s + n.vendido.total, 0)
   const comCanc = visiveis.filter((n) => n.canceladas.length)
-  const totCancelado = comCanc.reduce((s, n) => s + metricas(n.canceladas).total, 0)
+  const totCancelado = comCanc.reduce((s, n) => s + resumoCanceladas(n.linhas).excluido, 0)
 
   function abrir(tipo: 'cancelar' | 'reativar', n: Negocio) {
     const alvo = tipo === 'cancelar' ? n.ativas : n.canceladas
     setSel(Object.fromEntries(alvo.map((c) => [c.id, true]))) // por omissão, o projeto inteiro
-    setDataCanc(hoje()); setMotivo(''); setMsg('')
+    setDataCanc(hoje()); setMotivo(''); setMsg(''); setRealizados({})
     setModal({ tipo, n })
   }
 
@@ -96,18 +97,25 @@ export default function Negocios() {
     const alvo = (modal.tipo === 'cancelar' ? modal.n.ativas : modal.n.canceladas).filter((c) => sel[c.id])
     if (!alvo.length) { setMsg('Escolhe pelo menos uma linha.'); return }
     if (modal.tipo === 'cancelar' && !dataCanc) { setMsg('Indica a data do cancelamento.'); return }
+    if (modal.tipo === 'cancelar') {
+      for (const c of alvo) {
+        const v = Number(String(realizados[c.id] || '0').replace(',', '.'))
+        if (isNaN(v) || v < 0) { setMsg(`Valor pago inválido em ${c.produto?.tipo}.`); return }
+        if (v > Number(c.valor_venda || 0) + 0.005) { setMsg(`${c.produto?.tipo}: o valor pago não pode passar do valor da venda (${eur(Number(c.valor_venda || 0))}).`); return }
+      }
+    }
     setAGravar(true)
     try {
       for (const c of alvo) {
         const patch = modal.tipo === 'cancelar'
-          ? { cancelada: true, cancelada_em: dataCanc, motivo_cancelamento: motivo.trim() || null }
-          : { cancelada: false, cancelada_em: null, motivo_cancelamento: null }
+          ? { cancelada: true, cancelada_em: dataCanc, motivo_cancelamento: motivo.trim() || null, valor_realizado: Number(String(realizados[c.id] || '0').replace(',', '.')) || 0 }
+          : { cancelada: false, cancelada_em: null, motivo_cancelamento: null, valor_realizado: 0 }
         await updateComissao(c, patch as any, 'gestor') // fica no histórico da linha
       }
       setModal(null)
       await carregar()
     } catch (e: any) {
-      setMsg('Erro: ' + e.message + (/cancelad/.test(e.message) ? ' (corre primeiro o SQL criar-cancelamentos.sql)' : ''))
+      setMsg('Erro: ' + e.message + (/cancelad|realizado/.test(e.message) ? ' (corre primeiro os SQL criar-cancelamentos.sql e add-valor-realizado.sql)' : ''))
     } finally { setAGravar(false) }
   }
 
@@ -130,7 +138,7 @@ export default function Negocios() {
 
       {falta_sql && (
         <div className="mb-4 p-3 rounded-lg border border-orange-300 bg-orange-50 text-sm text-orange-800">
-          ⚠ Para registar cancelamentos, corre primeiro o SQL <b>criar-cancelamentos.sql</b> no Supabase.
+          ⚠ Para registar cancelamentos, corre primeiro no Supabase o SQL <b>criar-cancelamentos.sql</b> e o <b>add-valor-realizado.sql</b>.
         </div>
       )}
 
@@ -149,7 +157,7 @@ export default function Negocios() {
         <div className="ml-auto flex items-center gap-4 text-sm text-gray-600">
           <span><b className="text-host-navy">{visiveis.length}</b> negócios</span>
           <span>vendido <b className="text-host-navy">{eur(totVendido)}</b></span>
-          {comCanc.length > 0 && <span>⊘ {comCanc.length} com cancelamentos (<b>{eur(totCancelado)}</b>)</span>}
+          {comCanc.length > 0 && <span>⊘ {comCanc.length} com cancelamentos (<b>{eur(totCancelado)}</b> excluídos)</span>}
         </div>
       </div>
 
@@ -186,7 +194,7 @@ export default function Negocios() {
                     ))}
                   </div>
                 </td>
-                <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums font-semibold">{n.ativas.length ? eur(n.vendido.total) : '-'}</td>
+                <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums font-semibold">{n.vendido.total > 0 ? eur(n.vendido.total) : '-'}{n.canceladas.some((c) => Number(c.valor_realizado || 0) > 0) && <span className="block text-[10px] font-normal text-gray-400">inclui o pago pelo cliente</span>}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">{n.vendido.mrr > 0 ? `${eur(n.vendido.mrr)}/mês` : '-'}</td>
                 <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums" title={`Pago: ${eur(n.pago)}`}>
                   {eur(n.comissao)}{n.pago > 0 && n.pago < n.comissao - 0.005 && <span className="block text-[10px] text-gray-400">pago {eur(n.pago)}</span>}
@@ -222,6 +230,8 @@ export default function Negocios() {
         const escolhidas = alvo.filter((c) => sel[c.id])
         const pagoEscolhidas = escolhidas.reduce((s, c) => s + Number(c.valor_pago || 0), 0)
         const porPagar = escolhidas.reduce((s, c) => s + Math.max(0, Number(c.comissao_calculada || 0) - Number(c.valor_pago || 0)), 0)
+        const totalContrato = escolhidas.reduce((s, c) => s + Number(c.valor_venda || 0), 0)
+        const totalRealizado = escolhidas.reduce((s, c) => s + Math.min(Number(String(realizados[c.id] || '0').replace(',', '.')) || 0, Number(c.valor_venda || 0)), 0)
         return (
           <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 px-4 py-[6vh] overflow-y-auto" onClick={() => !aGravar && setModal(null)}>
             <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-5 my-auto" onClick={(e) => e.stopPropagation()}>
@@ -235,16 +245,27 @@ export default function Negocios() {
               </div>
               <div className="space-y-1.5 mb-4">
                 {alvo.map((c) => (
-                  <label key={c.id} className="flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50">
+                  <div key={c.id}>
+                  <label className="flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer hover:bg-gray-50">
                     <input type="checkbox" checked={!!sel[c.id]} onChange={(e) => setSel((s) => ({ ...s, [c.id]: e.target.checked }))} />
                     <span className="flex-1 min-w-0">
                       <span className="font-medium text-host-navy">{c.produto?.tipo}</span>
                       <span className="text-gray-500 text-xs"> · {fmtDate(c.data_adjudicacao)} · {c.is_saas ? `${eur(Number(c.valor_mensal_saas || 0))}/mês` : eur(Number(c.valor_venda))}</span>
                     </span>
                     <span className="text-xs text-gray-500 whitespace-nowrap">
-                      comissão {eur(Number(c.comissao_calculada || 0))}{Number(c.valor_pago || 0) > 0 ? ` · pago ${eur(Number(c.valor_pago))}` : ''}
+                      comissão {eur(Number(c.comissao_calculada || 0))}{Number(c.valor_pago || 0) > 0 ? ` · recebeste ${eur(Number(c.valor_pago))}` : ''}
                     </span>
                   </label>
+                  {modal.tipo === 'cancelar' && sel[c.id] && (
+                    <div className="flex items-center gap-2 pl-9 -mt-0.5 mb-1 text-xs text-gray-600">
+                      <span>O cliente chegou a pagar</span>
+                      <input inputMode="decimal" value={realizados[c.id] ?? ''} placeholder="0"
+                        onChange={(e) => setRealizados((r) => ({ ...r, [c.id]: e.target.value }))}
+                        className="w-24 border rounded px-2 py-1 text-right tabular-nums" />
+                      <span>€ de {eur(Number(c.valor_venda || 0))}{c.is_saas ? ` (${eur(Number(c.valor_mensal_saas || 0))}/mês)` : ''}</span>
+                    </div>
+                  )}
+                  </div>
                 ))}
               </div>
 
@@ -259,7 +280,7 @@ export default function Negocios() {
                     </label>
                   </div>
                   <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 space-y-1">
-                    <div>• Estas linhas <b>deixam de contar como vendas</b> nos relatórios e aparecem à parte como canceladas.</div>
+                    <div>• Nas vendas conta só o que o cliente pagou (<b>{eur(totalRealizado)}</b>); saem <b>{eur(totalContrato - totalRealizado)}</b>{escolhidas.some((c) => c.is_saas) ? ' e o MRR destas linhas' : ''}.</div>
                     {porPagar > 0.005 && <div>• A comissão ainda por pagar (<b>{eur(porPagar)}</b>) <b>deixa de ser devida</b> e sai dos próximos mapas.</div>}
                     {pagoEscolhidas > 0.005 && <div>• O que já foi pago (<b>{eur(pagoEscolhidas)}</b>) fica como histórico.</div>}
                     <div>• Fica registado no histórico de cada linha e pode ser reativado.</div>

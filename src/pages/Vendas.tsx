@@ -3,7 +3,7 @@
 import type { Comissao } from '../types'
 import { MESES } from '../utils'
 import {
-  metricas, noPeriodo, periodoComparavel, porMes, porProduto, porCliente, mrrAcumulado,
+  metricas, noPeriodo, periodoComparavel, porMes, porProduto, porCliente, mrrAcumulado, resumoCanceladas,
   variacao, fmtVar, COR_SAAS, COR_PONTUAL, COR_ANTERIOR, eur0, type Metricas,
 } from '../vendas'
 
@@ -20,9 +20,9 @@ export function textoPeriodo(ano: number) {
 
 /** todas as contas de uma vez (o painel e o relatório chamam isto) */
 export function calcularVendas(todas: Comissao[], ano: number) {
-  // vendas canceladas não contam como vendas: saem de todas as contas e são mostradas à parte
-  const comissoes = todas.filter((c) => !c.cancelada)
-  const canceladas = todas.filter((c) => c.cancelada)
+  // vendas canceladas: contam só o que o cliente chegou a pagar (o resto do contrato sai, e o MRR
+  // sai por inteiro). Essa regra vive em vendas.ts (valorContado/mensalidade), por isso entram todas.
+  const comissoes = todas
   const p = periodoComparavel(ano)
   const linhasA = noPeriodo(comissoes, p.atual.de, p.atual.ate)
   const linhasB = noPeriodo(comissoes, p.anterior.de, p.anterior.ate)
@@ -32,13 +32,13 @@ export function calcularVendas(todas: Comissao[], ano: number) {
   return {
     p, A, B, linhasA, linhasB,
     // o que saiu deste período por ter sido cancelado (pela data da venda)
-    canceladasA: metricas(noPeriodo(canceladas, p.atual.de, p.atual.ate)),
-    canceladasB: metricas(noPeriodo(canceladas, p.anterior.de, p.anterior.ate)),
+    canceladasA: resumoCanceladas(noPeriodo(todas, p.atual.de, p.atual.ate)),
+    canceladasB: resumoCanceladas(noPeriodo(todas, p.anterior.de, p.anterior.ate)),
     mesesA: porMes(comissoes, ano),
     mesesB: porMes(comissoes, ano - 1),
-    produtosA: porProduto(linhasA),
+    produtosA: porProduto(linhasA).filter((x) => x.total > 0),
     produtosB: porProduto(linhasB),
-    clientesA: porCliente(linhasA),
+    clientesA: porCliente(linhasA).filter((x) => x.total > 0),
     acumulado: mrrAcumulado(comissoes, ano, p.mesFim),
     // mês em curso do ano anterior, só até ao mesmo dia (para a linha ser comparável e a coluna somar o total)
     parcialAnt: p.emCurso ? metricas(noPeriodo(comissoes, `${ano - 1}-${String(p.mesFim).padStart(2, '0')}-01`, p.anterior.ate)) : null,
@@ -297,7 +297,7 @@ export default function VendasPainel({ comissoes, ano }: { comissoes: Comissao[]
       <div className="flex flex-wrap items-end justify-between gap-2 mb-3">
         <p className="text-sm text-gray-600">
           Vendas pela <b>data da venda</b> · {periodo} {ano}, comparado com o {ref}.
-          {v.canceladasA.n > 0 && <span className="ml-2 text-gray-500">· ⊘ {v.canceladasA.n} venda(s) cancelada(s) neste período ({eur(v.canceladasA.total)}) não contam.</span>}
+          {v.canceladasA.n > 0 && <span className="ml-2 text-gray-500">· ⊘ {v.canceladasA.negocios} negócio(s) cancelado(s) neste período{v.canceladasA.n > v.canceladasA.negocios ? ` (${v.canceladasA.n} linhas)` : ''}: excluídos {eur(v.canceladasA.excluido)}{v.canceladasA.realizado > 0 ? ` (conta só o que o cliente pagou: ${eur(v.canceladasA.realizado)})` : ''}.</span>}
         </p>
         <button onClick={() => window.open(`/relatorio?ano=${ano}`, '_blank')}
           className="no-print px-4 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold shadow-glow hover:bg-host-bluedark">

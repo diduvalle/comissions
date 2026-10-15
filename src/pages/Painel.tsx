@@ -732,7 +732,7 @@ export default function Painel() {
 const CAMPO_LABEL: Record<string, string> = {
   valor_pago: 'Valor pago', comissao_calculada: 'Comissão', percentagem: 'Percentagem',
   estado: 'Estado', observacoes: 'Observações', valor_venda: 'Valor da venda',
-  cancelada: 'Cancelada', cancelada_em: 'Cancelada em', motivo_cancelamento: 'Motivo do cancelamento',
+  cancelada: 'Cancelada', cancelada_em: 'Cancelada em', motivo_cancelamento: 'Motivo do cancelamento', valor_realizado: 'Pago pelo cliente (cancelada)',
 }
 
 function HistoricoLinha({ comissao, onClose }: { comissao: Comissao; onClose: () => void }) {
