@@ -53,7 +53,7 @@ export default function Relatorio() {
     `${p.emCurso ? `De ${periodo.replace(' - ', ' a ')} de ${ano}` : `Em ${ano}`}, o valor total vendido foi de ${eur(A.total)}`,
     vTotal != null ? `, ${sobeDesce(vTotal)} do que ${ref}` : '',
     '. ',
-    `A nova receita recorrente (MRR) foi de ${eur(A.mrr)}/mês`,
+    `A nova receita mensal de subscrições (MRR) foi de ${eur(A.mrr)}/mês`,
     vMrr != null ? ` (${sobeDesce(vMrr)})` : '',
     `, e as vendas pontuais somaram ${eur(A.pontual)}.`,
   ].join('')
@@ -130,7 +130,7 @@ export default function Relatorio() {
           <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-2">Resumo executivo</h2>
           <p className="text-[15px] leading-relaxed mb-4">{resumo}</p>
           <div className="grid grid-cols-4 gap-2.5 mb-3">
-            <Kpi destaque label="Novo MRR (SaaS)" valor={eur(A.mrr)} unidade="/mês" cor={COR_SAAS}
+            <Kpi destaque label="Nova receita mensal (SaaS)" valor={eur(A.mrr)} unidade="/mês" cor={COR_SAAS}
               sub={<><Var a={A.mrr} b={B.mrr} /><div className="text-gray-500">{anoAnt}: {eur(B.mrr)}/mês</div></>} />
             <Kpi label="SaaS anualizado" valor={eur(A.anual)} cor={COR_SAAS}
               sub={<><Var a={A.anual} b={B.anual} /><div className="text-gray-500">{anoAnt}: {eur(B.anual)}</div></>} />
@@ -142,14 +142,14 @@ export default function Relatorio() {
           <div className="grid grid-cols-3 gap-2.5 text-xs mb-5">
             <div className="rounded-lg bg-gray-50 px-3 py-2"><span className="text-gray-500">Nº de vendas</span><div className="text-base font-bold tabular-nums">{A.n} <span className="text-xs font-normal"><Var a={A.n} b={B.n} /></span></div></div>
             <div className="rounded-lg bg-gray-50 px-3 py-2"><span className="text-gray-500">Valor médio por venda</span><div className="text-base font-bold tabular-nums">{eur(ticketA)}</div></div>
-            <div className="rounded-lg bg-gray-50 px-3 py-2"><span className="text-gray-500">Novo MRR acumulado (histórico)</span><div className="text-base font-bold tabular-nums" style={{ color: COR_SAAS }}>{eur(acumulado)}/mês</div></div>
+            <div className="rounded-lg bg-gray-50 px-3 py-2"><span className="text-gray-500">Receita mensal acumulada (histórico)</span><div className="text-base font-bold tabular-nums" style={{ color: COR_SAAS }}>{eur(acumulado)}/mês</div></div>
           </div>
         </div>
 
         <div className="mb-5">
-          <GraficoMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} soPeriodo parcialAnt={v.parcialAnt} altura="h-36" />
+          <GraficoMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} soPeriodo parcialAnt={v.parcialAnt} altura="h-32" />
         </div>
-        <GraficoMrrAcumulado dados={v.acumulado} altura="h-28" />
+        <GraficoMrrAcumulado dados={v.acumulado} altura="h-24" />
       </Folha>
 
       {/* ===== Página 2: detalhe ===== */}
@@ -157,19 +157,19 @@ export default function Relatorio() {
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-2">Mês a mês</h2>
           <div className="break-inside-avoid mb-6">
-            <TabelaMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} A={A} B={B} periodo={periodo} parcialAnt={v.parcialAnt} diaFim={v.diaFim} />
+            <TabelaMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} A={A} B={B} periodo={periodo} parcialAnt={v.parcialAnt} diaFim={v.diaFim} compacta />
           </div>
 
           <div className="grid grid-cols-2 gap-6 mb-6">
             <div className="break-inside-avoid">
-              <ListaBarras titulo="Por produto"
+              <ListaBarras compacta titulo="Por produto"
                 itens={v.produtosA.slice(0, 8).map((x) => ({ nome: x.tipo, total: x.total, cor: x.saas ? COR_SAAS : COR_PONTUAL, detalhe: `${x.n}` }))}
               />
               <p className="text-[10px] text-gray-500 mt-2 leading-snug">{"Desde dez/2025, Setup Fee e SaaS > 24 passaram a ser registados à parte (antes contavam como Serviços e SaaS < 24). Por isso não se compara produto a produto com anos anteriores; a comparação válida é pontual vs recorrente."}</p>
             </div>
             <div className="break-inside-avoid">
-              <ListaBarras titulo="Principais clientes"
-                itens={v.clientesA.slice(0, 10).map((x) => ({ nome: x.nome, total: x.total, cor: x.mrr > 0 ? COR_SAAS : COR_PONTUAL }))} />
+              <ListaBarras compacta titulo="Principais clientes"
+                itens={v.clientesA.slice(0, 8).map((x) => ({ nome: x.nome, total: x.total, cor: x.mrr > 0 ? COR_SAAS : COR_PONTUAL }))} />
             </div>
           </div>
         </div>
@@ -197,9 +197,9 @@ export default function Relatorio() {
               <li><b>Fonte:</b> vendas com comissão registada na aplicação de gestão de comissões. Não substitui os registos contabilísticos da empresa.</li>
               <li><b>Data:</b> cada venda conta no mês da sua data de adjudicação.</li>
               {p.emCurso && <li><b>Comparação justa:</b> o ano em curso ({periodo} {ano}) é comparado com o mesmo intervalo de dias de {anoAnt}, nunca com o ano completo. O mês em curso não é comparado, por estar incompleto.</li>}
-              <li><b>SaaS:</b> "novo MRR" é a mensalidade das novas subscrições vendidas; "anualizado" = mensalidade × 12. <b>Valor total vendido</b> = vendas pontuais + SaaS anualizado (valor do primeiro ano).</li>
-              <li><b>Vendas canceladas:</b> contam apenas o valor que o cliente chegou a pagar; o resto do contrato é excluído, e o MRR é excluído por inteiro.{v.canceladasA.n > 0 ? ` No período: ${v.canceladasA.negocios} negócio(s) cancelado(s), ${eur(v.canceladasA.excluido)} excluídos${v.canceladasA.realizado > 0 ? ` (${eur(v.canceladasA.realizado)} pagos pelo cliente mantêm-se)` : ''}.` : ' Não há vendas canceladas registadas no período.'}</li>
-              <li><b>Novo MRR acumulado</b> soma as mensalidades vendidas desde o início do registo; só desconta os cancelamentos registados na aplicação.</li>
+              <li><b>SaaS:</b> a "nova receita mensal" (em inglês MRR, <i>Monthly Recurring Revenue</i>) é a soma das mensalidades das novas subscrições vendidas; "anualizado" = mensalidade × 12. <b>Valor total vendido</b> = vendas pontuais + SaaS anualizado (valor do primeiro ano).</li>
+              <li><b>Vendas canceladas:</b> contam apenas o valor que o cliente chegou a pagar; o resto do contrato é excluído, e a receita mensal é excluída por inteiro.{v.canceladasA.n > 0 ? ` No período: ${v.canceladasA.negocios} negócio(s) cancelado(s), ${eur(v.canceladasA.excluido)} excluídos${v.canceladasA.realizado > 0 ? ` (${eur(v.canceladasA.realizado)} pagos pelo cliente mantêm-se)` : ''}.` : ' Não há vendas canceladas registadas no período.'}</li>
+              <li><b>Receita mensal acumulada</b> soma as mensalidades vendidas desde o início do registo; só desconta os cancelamentos registados na aplicação.</li>
               <li><b>Arredondamentos:</b> os valores são apresentados ao euro; a soma das linhas pode diferir do total em ±1 €.</li>
             </ul>
           </div>

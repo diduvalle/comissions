@@ -131,19 +131,20 @@ export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo 
 }
 
 /** a tabela é a vista acessível do gráfico mensal: todos os números, sem depender da cor */
-export function TabelaMensal({ mesesA, mesesB, ano, mesFim, emCurso, A, B, periodo, parcialAnt, diaFim }: {
+export function TabelaMensal({ mesesA, mesesB, ano, mesFim, emCurso, A, B, periodo, parcialAnt, diaFim, compacta = false }: {
   mesesA: Metricas[]; mesesB: Metricas[]; ano: number; mesFim: number; emCurso: boolean; A: Metricas; B: Metricas; periodo: string
-  parcialAnt?: Metricas | null; diaFim?: number
+  parcialAnt?: Metricas | null; diaFim?: number; compacta?: boolean // relatório A4: linhas mais baixas
 }) {
-  const td = 'px-2 py-1.5 text-right tabular-nums'
+  const py = compacta ? 'py-1' : 'py-1.5'
+  const td = `px-2 ${py} text-right tabular-nums`
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[12px]">
         <thead>
           <tr className="text-gray-500 border-b">
-            <th className="px-2 py-1.5 text-left font-medium">Mês</th>
+            <th className={`px-2 ${py} text-left font-medium`}>Mês</th>
             <th className={`${td} font-medium`}>Pontual</th>
-            <th className={`${td} font-medium`}>Novo MRR</th>
+            <th className={`${td} font-medium`}>Receita mensal</th>
             <th className={`${td} font-medium`}>SaaS anual.</th>
             <th className={`${td} font-medium`}>Total {ano}</th>
             <th className={`${td} font-medium`}>Total {ano - 1}</th>
@@ -157,7 +158,7 @@ export function TabelaMensal({ mesesA, mesesB, ano, mesFim, emCurso, A, B, perio
             const b = mesesB[i]
             return (
               <tr key={i} className={`border-b border-gray-100 ${futuro ? 'text-gray-300' : ''}`}>
-                <td className="px-2 py-1.5">{MESES[i]}{corrente && <span className="ml-1 text-[10px] text-gray-400">(1-{diaFim})</span>}</td>
+                <td className={`px-2 ${py}`}>{MESES[i]}{corrente && <span className="ml-1 text-[10px] text-gray-400">(1-{diaFim})</span>}</td>
                 <td className={td}>{futuro ? '-' : eur(m.pontual)}</td>
                 <td className={td}>{futuro ? '-' : `${eur(m.mrr)}`}</td>
                 <td className={td}>{futuro ? '-' : eur(m.anual)}</td>
@@ -171,7 +172,7 @@ export function TabelaMensal({ mesesA, mesesB, ano, mesFim, emCurso, A, B, perio
         </tbody>
         <tfoot>
           <tr className="border-t-2 border-gray-300 font-semibold text-host-navy">
-            <td className="px-2 py-2">{emCurso ? `Período (${periodo})` : 'Total do ano'}</td>
+            <td className={`px-2 ${compacta ? 'py-1.5' : 'py-2'}`}>{emCurso ? `Período (${periodo})` : 'Total do ano'}</td>
             <td className={td}>{eur(A.pontual)}</td>
             <td className={td}>{eur(A.mrr)}</td>
             <td className={td}>{eur(A.anual)}</td>
@@ -197,7 +198,7 @@ export function GraficoMrrAcumulado({ dados, altura = 'h-44' }: { dados: { ano: 
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1">
-        <h3 className="font-semibold text-host-navy">Novo MRR acumulado</h3>
+        <h3 className="font-semibold text-host-navy">Receita mensal acumulada</h3>
         <span className="text-sm text-gray-600">hoje: <b className="tabular-nums" style={{ color: COR_SAAS }}>{eur(ult.acumulado)}/mês</b></span>
       </div>
       <p className="text-[11px] text-gray-500 mb-2">Soma da receita recorrente mensal que vendeste desde {MESES[dados[0].mes - 1].toLowerCase()} {dados[0].ano}. Exclui as vendas registadas como canceladas.</p>
@@ -251,17 +252,18 @@ export function MixPorAno({ dados, anoAtual }: { dados: (Metricas & { ano: numbe
 }
 
 /** lista com barras horizontais (produtos, clientes) - a cor segue a categoria do produto */
-export function ListaBarras({ titulo, itens, comparar }: {
+export function ListaBarras({ titulo, itens, comparar, compacta = false }: {
   titulo: string
   itens: { nome: string; total: number; cor: string; detalhe?: string }[]
   comparar?: Record<string, number>
+  compacta?: boolean // relatório A4: itens mais juntos
 }) {
   const max = Math.max(1, ...itens.map((i) => i.total))
   return (
     <div>
-      <h3 className="font-semibold text-host-navy mb-3">{titulo}</h3>
+      <h3 className={`font-semibold text-host-navy ${compacta ? 'mb-2' : 'mb-3'}`}>{titulo}</h3>
       {itens.length === 0 ? <p className="text-sm text-gray-400">Sem vendas no período.</p> : (
-        <div className="space-y-2">
+        <div className={compacta ? 'space-y-1' : 'space-y-2'}>
           {itens.map((it) => (
             <div key={it.nome} className="break-inside-avoid">
               <div className="flex justify-between text-xs mb-0.5 gap-2">
@@ -306,7 +308,7 @@ export default function VendasPainel({ comissoes, ano }: { comissoes: Comissao[]
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
-        <Kpi destaque label="Novo MRR (SaaS)" valor={eur(A.mrr)} unidade="/mês" cor={COR_SAAS} sub={<><Var a={A.mrr} b={B.mrr} /> <span className="text-gray-500">vs {ref}</span></>} />
+        <Kpi destaque label="Nova receita mensal (SaaS)" valor={eur(A.mrr)} unidade="/mês" cor={COR_SAAS} sub={<><Var a={A.mrr} b={B.mrr} /> <span className="text-gray-500">vs {ref}</span></>} />
         <Kpi label="SaaS anualizado" valor={eur(A.anual)} cor={COR_SAAS} sub={<Var a={A.anual} b={B.anual} />} />
         <Kpi label="Vendas pontuais" valor={eur(A.pontual)} cor={COR_PONTUAL} sub={<Var a={A.pontual} b={B.pontual} />} />
         <Kpi label="Valor total vendido" valor={eur(A.total)} sub={<Var a={A.total} b={B.total} />} />

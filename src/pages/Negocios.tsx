@@ -170,7 +170,7 @@ export default function Negocios() {
               <th className="px-3 py-2 font-medium">Cliente</th>
               <th className="px-3 py-2 font-medium">Produtos</th>
               <th className="px-3 py-2 font-medium text-right">Valor vendido</th>
-              <th className="px-3 py-2 font-medium text-right">MRR</th>
+              <th className="px-3 py-2 font-medium text-right">Receita mensal</th>
               <th className="px-3 py-2 font-medium text-right">Comissão</th>
               <th className="px-3 py-2 font-medium">Estado</th>
               <th className="px-3 py-2 font-medium" />
@@ -280,7 +280,7 @@ export default function Negocios() {
                     </label>
                   </div>
                   <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600 space-y-1">
-                    <div>• Nas vendas conta só o que o cliente pagou (<b>{eur(totalRealizado)}</b>); saem <b>{eur(totalContrato - totalRealizado)}</b>{escolhidas.some((c) => c.is_saas) ? ' e o MRR destas linhas' : ''}.</div>
+                    <div>• Nas vendas conta só o que o cliente pagou (<b>{eur(totalRealizado)}</b>); saem <b>{eur(totalContrato - totalRealizado)}</b>{escolhidas.some((c) => c.is_saas) ? ' e a receita mensal destas linhas' : ''}.</div>
                     {porPagar > 0.005 && <div>• A comissão ainda por pagar (<b>{eur(porPagar)}</b>) <b>deixa de ser devida</b> e sai dos próximos mapas.</div>}
                     {pagoEscolhidas > 0.005 && <div>• O que já foi pago (<b>{eur(pagoEscolhidas)}</b>) fica como histórico.</div>}
                     <div>• Fica registado no histórico de cada linha e pode ser reativado.</div>
