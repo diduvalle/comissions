@@ -55,6 +55,27 @@ export function metricas(linhas: Comissao[]): Metricas {
   }
 }
 
+export type ItemComposicao = { nr: string; cliente: string; pontual: number; saas: number; total: number; cancelada: boolean }
+
+/** De onde vem um valor: agrupa por nº de projeto o que conta nas estatísticas (numa venda
+ *  cancelada, só o que o cliente pagou), do maior para o menor. SaaS vem anualizado (× 12). */
+export function composicao(linhas: Comissao[]): ItemComposicao[] {
+  const g: Record<string, ItemComposicao> = {}
+  for (const c of linhas) {
+    const v = valorContado(c)
+    if (v <= 0) continue
+    const k = String(c.numero_projeto)
+    const it = (g[k] ||= { nr: k, cliente: c.cliente?.nome || '-', pontual: 0, saas: 0, total: 0, cancelada: false })
+    if (c.is_saas) it.saas += v
+    else it.pontual += v
+    it.total += v
+    if (c.cancelada) it.cancelada = true
+  }
+  return Object.values(g)
+    .map((x) => ({ ...x, pontual: r2(x.pontual), saas: r2(x.saas), total: r2(x.total) }))
+    .sort((a, b) => b.total - a.total)
+}
+
 /** vendas canceladas de um conjunto: nº, valor do contrato, o que foi pago e o que saiu das estatísticas */
 export function resumoCanceladas(linhas: Comissao[]) {
   const ls = linhas.filter((c) => c.cancelada)

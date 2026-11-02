@@ -1,9 +1,10 @@
 // Secção "Vendas" do Analytics + blocos reutilizados pelo Relatório PDF.
 // Todas as contas vêm de ../vendas.ts, por isso o ecrã e o PDF mostram sempre os mesmos números.
+import { useState } from 'react'
 import type { Comissao } from '../types'
 import { MESES } from '../utils'
 import {
-  metricas, noPeriodo, periodoComparavel, porMes, porProduto, porCliente, mrrAcumulado, resumoCanceladas,
+  metricas, noPeriodo, periodoComparavel, porMes, porProduto, porCliente, mrrAcumulado, resumoCanceladas, composicao, type ItemComposicao,
   variacao, fmtVar, COR_SAAS, COR_PONTUAL, COR_ANTERIOR, eur0, type Metricas,
 } from '../vendas'
 
@@ -31,6 +32,7 @@ export function calcularVendas(todas: Comissao[], ano: number) {
   const anos = [...new Set(comissoes.map((c) => Number(c.data_adjudicacao?.slice(0, 4))).filter(Boolean))].sort()
   return {
     p, A, B, linhasA, linhasB,
+    todas, // para o detalhe por projeto nos gráficos
     // o que saiu deste período por ter sido cancelado (pela data da venda)
     canceladasA: resumoCanceladas(noPeriodo(todas, p.atual.de, p.atual.ate)),
     canceladasB: resumoCanceladas(noPeriodo(todas, p.anterior.de, p.anterior.ate)),
@@ -84,12 +86,59 @@ function Legenda({ itens }: { itens: { cor: string; texto: string }[] }) {
   )
 }
 
-/** valor vendido por mês: ano em análise vs ano anterior (barras emparelhadas, eixo único) */
-export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo = false, parcialAnt = null, altura = 'h-44' }: {
+/** Cartão de detalhe (mouseover): de onde vem um valor, projeto a projeto.
+ *  Mostra os maiores e agrupa o resto, para se ler de relance. */
+function Detalhe({ titulo, total, subtitulo, itens, campo, estilo }: {
+  titulo: string; total: number; subtitulo?: string
+  itens: ItemComposicao[]; campo: 'total' | 'pontual' | 'saas'; estilo: React.CSSProperties
+}) {
+  const MAX = 8
+  const lista = itens.filter((x) => x[campo] > 0)
+  const top = lista.slice(0, MAX)
+  const resto = lista.slice(MAX)
+  const somaResto = resto.reduce((s, x) => s + x[campo], 0)
+  const pct = (v: number) => { const p = total > 0 ? (v / total) * 100 : 0; return p > 0 && p < 1 ? '<1%' : `${Math.round(p)}%` }
+  return (
+    <div className="absolute z-30 w-80 pointer-events-none rounded-lg border border-gray-200 bg-white shadow-xl p-3 text-xs" style={estilo}>
+      <div className="flex items-baseline justify-between gap-2">
+        <b className="text-[13px] text-host-navy">{titulo}</b>
+        <b className="tabular-nums text-host-navy">{eur(total)}</b>
+      </div>
+      {subtitulo && <div className="text-gray-500 mt-0.5">{subtitulo}</div>}
+      {top.length === 0 ? <div className="text-gray-400 mt-2">Sem vendas registadas.</div> : (
+        <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
+          {top.map((it) => (
+            <div key={it.nr} className="flex items-baseline gap-2">
+              <span className="w-11 shrink-0 tabular-nums text-gray-400">{it.nr}</span>
+              <span className="flex-1 min-w-0 truncate text-gray-700">
+                {it.cliente}{it.cancelada && <span className="text-gray-400"> · cancelado (pago)</span>}
+              </span>
+              <span className="tabular-nums font-semibold text-host-navy">{eur(it[campo])}</span>
+              <span className="w-9 shrink-0 text-right tabular-nums text-gray-400">{pct(it[campo])}</span>
+            </div>
+          ))}
+          {resto.length > 0 && (
+            <div className="flex items-baseline gap-2 pt-1 border-t border-gray-100 text-gray-500">
+              <span className="flex-1">+ {resto.length} outro(s) projeto(s)</span>
+              <span className="tabular-nums">{eur(somaResto)}</span>
+              <span className="w-9 shrink-0 text-right tabular-nums">{pct(somaResto)}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** valor vendido por mês: ano em análise vs ano anterior (barras emparelhadas, eixo único).
+ *  Com `linhas`, cada barra mostra no mouseover os projetos que fazem esse valor. */
+export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo = false, parcialAnt = null, altura = 'h-44', linhas }: {
   mesesA: Metricas[]; mesesB: Metricas[]; ano: number; mesFim: number; emCurso: boolean
   soPeriodo?: boolean; parcialAnt?: Metricas | null // relatório: só o período comparável (igual à tabela)
   altura?: string
+  linhas?: Comissao[] // todas as linhas: ativa o detalhe por projeto no mouseover
 }) {
+  const [hover, setHover] = useState<{ i: number; y: number } | null>(null)
   // valor do ano anterior a desenhar em cada mês: no relatório, o mês em curso conta só os mesmos dias
   // e os meses seguintes não aparecem, para o gráfico bater certo com a tabela e com o total
   const ant = mesesB.map((b, i) => {
@@ -98,13 +147,41 @@ export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo 
     return i + 1 === mesFim && parcialAnt ? parcialAnt.total : b.total
   })
   const max = Math.max(1, ...mesesA.map((m) => m.total), ...ant)
+
+  // composição do mês/ano em foco (só se calcula ao passar o rato)
+  let detalhe: React.ReactNode = null
+  if (hover && linhas) {
+    const pref = `${hover.y}-${String(hover.i + 1).padStart(2, '0')}`
+    const itens = composicao(linhas.filter((c) => c.data_adjudicacao?.startsWith(pref)))
+    const tot = itens.reduce((s, x) => s + x.total, 0)
+    const pon = itens.reduce((s, x) => s + x.pontual, 0)
+    const direita = hover.i < 6 // meses da 1.ª metade: cartão à direita da coluna; os outros à esquerda
+    const col = 100 / 12
+    detalhe = (
+      <Detalhe titulo={`${MESES[hover.i]} ${hover.y}`} total={tot} itens={itens} campo="total"
+        subtitulo={`${itens.length} projeto(s) · pontual ${eur(pon)} · SaaS anual. ${eur(tot - pon)}`}
+        estilo={direita ? { top: 0, left: `calc(${(hover.i + 1) * col}% + 6px)` } : { top: 0, right: `calc(${(12 - hover.i) * col}% + 6px)` }} />
+    )
+  }
+
+  const barra = (i: number, y: number, valor: number, cor: string, lado: 'esq' | 'dir') => {
+    const ativo = hover && hover.i === i && hover.y === y
+    return (
+      <div className={`w-1/2 h-full flex items-end ${lado === 'esq' ? 'justify-end pr-px' : 'justify-start pl-px'}`}
+        onMouseEnter={linhas ? () => setHover({ i, y }) : undefined}>
+        <div className="w-[84%] rounded-t-[4px] transition-opacity"
+          style={{ height: `${(valor / max) * 100}%`, background: cor, opacity: hover && !ativo ? 0.35 : 1 }} />
+      </div>
+    )
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-host-navy">Valor vendido por mês</h3>
         <Legenda itens={[{ cor: COR_ANTERIOR, texto: String(ano - 1) }, { cor: COR_SAAS, texto: String(ano) }]} />
       </div>
-      <div className={`relative ${altura}`}>
+      <div className={`relative ${altura}`} onMouseLeave={() => setHover(null)}>
         {/* grelha recessiva: 50% e 100% do máximo */}
         {[0.5, 1].map((f) => (
           <div key={f} className="absolute left-0 right-0 border-t border-dashed border-gray-200" style={{ bottom: `${f * 100}%` }}>
@@ -115,17 +192,20 @@ export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo 
           {mesesA.map((m, i) => {
             const futuro = emCurso && i + 1 > mesFim
             return (
-              <div key={i} className="flex-1 flex items-end justify-center gap-[2px] h-full"
-                title={`${MESES[i]} ${ano}: ${futuro ? '-' : eur(m.total)}  (pontual ${eur(m.pontual)} · SaaS ${eur(m.mrr)}/mês)\n${MESES[i]} ${ano - 1}: ${eur(ant[i])}`}>
-                <div className="w-[42%] rounded-t-[4px]" style={{ height: `${(ant[i] / max) * 100}%`, background: COR_ANTERIOR }} />
-                <div className="w-[42%] rounded-t-[4px]" style={{ height: futuro ? 0 : `${(m.total / max) * 100}%`, background: COR_SAAS }} />
+              <div key={i} className="flex-1 flex items-end h-full"
+                title={linhas ? undefined : `${MESES[i]} ${ano}: ${futuro ? '-' : eur(m.total)}\n${MESES[i]} ${ano - 1}: ${eur(ant[i])}`}>
+                {barra(i, ano - 1, ant[i], COR_ANTERIOR, 'esq')}
+                {barra(i, ano, futuro ? 0 : m.total, COR_SAAS, 'dir')}
               </div>
             )
           })}
         </div>
+        {detalhe}
       </div>
       <div className="flex gap-1.5 mt-1">{MESES.map((_, i) => <div key={i} className="flex-1 text-center text-[10px] text-gray-500">{abrev(i)}</div>)}</div>
-      <p className="text-[11px] text-gray-500 mt-2">Valor vendido = vendas pontuais + SaaS anualizado (mensalidade × 12).</p>
+      <p className="text-[11px] text-gray-500 mt-2">
+        Valor vendido = vendas pontuais + SaaS anualizado (mensalidade × 12).{linhas && <span className="no-print"> Passa o rato sobre uma barra para ver os projetos.</span>}
+      </p>
     </div>
   )
 }
@@ -224,29 +304,57 @@ export function GraficoMrrAcumulado({ dados, altura = 'h-44' }: { dados: { ano: 
   )
 }
 
-/** mix pontual vs recorrente por ano (barras 100%, duas categorias com o mesmo peso visual) */
-export function MixPorAno({ dados, anoAtual }: { dados: (Metricas & { ano: number; primeiroMes: number })[]; anoAtual: number }) {
+/** mix pontual vs recorrente por ano (barras 100%, duas categorias com o mesmo peso visual).
+ *  Com `linhas`, cada parte mostra no mouseover os projetos que a compõem. */
+export function MixPorAno({ dados, anoAtual, linhas }: {
+  dados: (Metricas & { ano: number; primeiroMes: number })[]; anoAtual: number
+  linhas?: Comissao[]
+}) {
+  const [hover, setHover] = useState<{ ano: number; tipo: 'pontual' | 'saas' } | null>(null)
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-host-navy">Mix pontual vs recorrente</h3>
         <Legenda itens={[{ cor: COR_PONTUAL, texto: 'Pontual' }, { cor: COR_SAAS, texto: 'SaaS (anualizado)' }]} />
       </div>
-      <div className="space-y-2.5">
+      <div className="space-y-2.5" onMouseLeave={() => setHover(null)}>
         {dados.map((d) => {
           const pp = d.total > 0 ? (d.pontual / d.total) * 100 : 0
+          const emFoco = hover?.ano === d.ano
+          const seg = (tipo: 'pontual' | 'saas') => ({
+            onMouseEnter: linhas ? () => setHover({ ano: d.ano, tipo }) : undefined,
+            style: {
+              width: `${tipo === 'pontual' ? pp : 100 - pp}%`,
+              background: tipo === 'pontual' ? COR_PONTUAL : COR_SAAS,
+              opacity: hover && !(emFoco && hover.tipo === tipo) ? 0.4 : 1,
+            },
+          })
+          let detalhe: React.ReactNode = null
+          if (emFoco && linhas && hover) {
+            const itens = composicao(linhas.filter((c) => c.data_adjudicacao?.startsWith(String(d.ano))))
+              .filter((x) => x[hover.tipo] > 0).sort((a, b) => b[hover.tipo] - a[hover.tipo])
+            const tot = hover.tipo === 'pontual' ? d.pontual : d.anual
+            const pctAno = d.total > 0 ? Math.round((tot / d.total) * 100) : 0
+            detalhe = (
+              <Detalhe titulo={`${d.ano} · ${hover.tipo === 'pontual' ? 'Pontual' : 'SaaS (anualizado)'}`} total={tot} itens={itens} campo={hover.tipo}
+                subtitulo={`${itens.length} projeto(s) · ${pctAno}% do valor vendido no ano`}
+                estilo={hover.tipo === 'pontual' ? { top: '100%', left: '7.5rem', marginTop: 6 } : { top: '100%', right: '6.75rem', marginTop: 6 }} />
+            )
+          }
           return (
-            <div key={d.ano} className="flex items-center gap-3" title={`${d.ano}: pontual ${eur(d.pontual)} · SaaS ${eur(d.anual)}`}>
+            <div key={d.ano} className="relative flex items-center gap-3" title={linhas ? undefined : `${d.ano}: pontual ${eur(d.pontual)} · SaaS ${eur(d.anual)}`}>
               <span className="w-28 text-xs text-gray-600 shrink-0">{d.ano}{d.ano === anoAtual && new Date().getFullYear() === anoAtual ? ' (até hoje)' : d.primeiroMes > 1 ? ` (desde ${abrev(d.primeiroMes - 1).toLowerCase()})` : ''}</span>
               <div className="flex-1 flex h-6 gap-[2px] rounded-md overflow-hidden text-[11px] font-semibold text-white">
-                <div className="flex items-center justify-center" style={{ width: `${pp}%`, background: COR_PONTUAL }}>{pp >= 14 ? `${pp.toFixed(0)}%` : ''}</div>
-                <div className="flex items-center justify-center" style={{ width: `${100 - pp}%`, background: COR_SAAS }}>{100 - pp >= 14 ? `${(100 - pp).toFixed(0)}%` : ''}</div>
+                <div className="flex items-center justify-center transition-opacity" {...seg('pontual')}>{pp >= 14 ? `${pp.toFixed(0)}%` : ''}</div>
+                <div className="flex items-center justify-center transition-opacity" {...seg('saas')}>{100 - pp >= 14 ? `${(100 - pp).toFixed(0)}%` : ''}</div>
               </div>
               <span className="w-24 text-right text-xs font-semibold text-host-navy tabular-nums shrink-0">{eur(d.total)}</span>
+              {detalhe}
             </div>
           )
         })}
       </div>
+      {linhas && <p className="text-[11px] text-gray-500 mt-3 no-print">Passa o rato sobre uma parte da barra para ver os projetos.</p>}
     </div>
   )
 }
@@ -316,7 +424,7 @@ export default function VendasPainel({ comissoes, ano }: { comissoes: Comissao[]
       </div>
 
       <div className="bg-white rounded-xl border p-4 mb-3">
-        <GraficoMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} />
+        <GraficoMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} linhas={v.todas} />
       </div>
 
       <div className="bg-white rounded-xl border p-4 mb-3">
@@ -326,7 +434,7 @@ export default function VendasPainel({ comissoes, ano }: { comissoes: Comissao[]
 
       <div className="grid lg:grid-cols-2 gap-3 mb-3">
         <div className="bg-white rounded-xl border p-4"><GraficoMrrAcumulado dados={v.acumulado} /></div>
-        <div className="bg-white rounded-xl border p-4"><MixPorAno dados={v.mixAnos} anoAtual={ano} /></div>
+        <div className="bg-white rounded-xl border p-4"><MixPorAno dados={v.mixAnos} anoAtual={ano} linhas={v.todas} /></div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-3 mb-3">
