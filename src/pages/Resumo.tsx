@@ -3,7 +3,7 @@ import { supabase } from '../supabase'
 import type { Comissao, Envio } from '../types'
 import { eur, parseMref, MESES } from '../utils'
 import VendasPainel from './Vendas'
-import { COR_PONTUAL } from '../vendas'
+import { COR_PONTUAL, type SelecaoPeriodo } from '../vendas'
 
 const COR_REC = '#0667FF' // recorrente (SaaS) - azul Host
 // pontual: violeta validado (o cinzento antigo lia-se como "desativado" e o texto branco não se via)
@@ -19,6 +19,8 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
   const [loading, setLoading] = useState(true)
   const [ano, setAno] = useState<number>(0)
   const [vista, setVista] = useState<'comissoes' | 'vendas'>('comissoes')
+  // período das Vendas: fica aqui para não se perder ao trocar de separador
+  const [selVendas, setSelVendas] = useState<SelecaoPeriodo>({ preset: 'ano', modo: 'homologo' })
 
   async function carregar() {
     const [{ data: c }, { data: e }, { data: pv }] = await Promise.all([
@@ -205,7 +207,7 @@ export default function Resumo({ publico = false }: { publico?: boolean }) {
         </div>
       )}
 
-      {!publico && vista === 'vendas' ? <VendasPainel comissoes={comissoes} ano={ano} /> : (<>
+      {!publico && vista === 'vendas' ? <VendasPainel comissoes={comissoes} ano={ano} sel={selVendas} setSel={setSelVendas} /> : (<>
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
         <Card label={`Comissão ganha (${ano})`} valor={eur(totComissao)}

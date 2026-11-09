@@ -1,56 +1,66 @@
 // Secção "Vendas" do Analytics + blocos reutilizados pelo Relatório PDF.
 // Todas as contas vêm de ../vendas.ts, por isso o ecrã e o PDF mostram sempre os mesmos números.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Comissao } from '../types'
 import { MESES } from '../utils'
 import {
-  metricas, noPeriodo, periodoComparavel, porMes, porProduto, porCliente, mrrAcumulado, resumoCanceladas, composicao, type ItemComposicao,
+  metricas, noPeriodo, porProduto, porCliente, mrrAcumulado, resumoCanceladas, composicao, type ItemComposicao,
   variacao, fmtVar, COR_SAAS, COR_PONTUAL, COR_ANTERIOR, eur0, type Metricas,
+  calcularPeriodo, textoDatas, nomeIntervalo, diasParciais, hojeIso, fmtDia,
+  type Periodo, type Balde, type SelecaoPeriodo, type Preset, type ModoComparacao,
 } from '../vendas'
 
 const eur = eur0
 
 const abrev = (i: number) => MESES[i].slice(0, 3)
-export const fmtDia = (iso: string) => `${Number(iso.slice(8, 10))} ${abrev(Number(iso.slice(5, 7)) - 1).toLowerCase()}`
 
-/** texto do período, ex.: "1 jan - 7 out" ou "ano completo" */
-export function textoPeriodo(ano: number) {
-  const p = periodoComparavel(ano)
-  return p.emCurso ? `1 jan - ${fmtDia(p.atual.ate)}` : 'ano completo'
-}
+/** um mês do período, com as métricas dele e do pedaço correspondente da comparação */
+export type MesComparado = Balde & { A: Metricas; B: Metricas }
 
 /** todas as contas de uma vez (o painel e o relatório chamam isto) */
-export function calcularVendas(todas: Comissao[], ano: number) {
+export function calcularVendas(todas: Comissao[], p: Periodo) {
   // vendas canceladas: contam só o que o cliente chegou a pagar (o resto do contrato sai, e o MRR
   // sai por inteiro). Essa regra vive em vendas.ts (valorContado/mensalidade), por isso entram todas.
-  const comissoes = todas
-  const p = periodoComparavel(ano)
-  const linhasA = noPeriodo(comissoes, p.atual.de, p.atual.ate)
-  const linhasB = noPeriodo(comissoes, p.anterior.de, p.anterior.ate)
+  const linhasA = noPeriodo(todas, p.atual.de, p.atual.ate)
+  const linhasB = noPeriodo(todas, p.anterior.de, p.anterior.ate)
   const A = metricas(linhasA)
   const B = metricas(linhasB)
-  const anos = [...new Set(comissoes.map((c) => Number(c.data_adjudicacao?.slice(0, 4))).filter(Boolean))].sort()
+  const anoFim = Number(p.atual.ate.slice(0, 4)), mesFim = Number(p.atual.ate.slice(5, 7))
+  const datas = todas.map((c) => c.data_adjudicacao).filter(Boolean).sort()
+  const inicioHistorico = datas.length ? `${datas[0].slice(0, 7)}-01` : null
+  const anos = [...new Set(datas.map((d) => Number(d.slice(0, 4))))].sort()
   return {
     p, A, B, linhasA, linhasB,
     todas, // para o detalhe por projeto nos gráficos
     // o que saiu deste período por ter sido cancelado (pela data da venda)
-    canceladasA: resumoCanceladas(noPeriodo(todas, p.atual.de, p.atual.ate)),
-    canceladasB: resumoCanceladas(noPeriodo(todas, p.anterior.de, p.anterior.ate)),
-    mesesA: porMes(comissoes, ano),
-    mesesB: porMes(comissoes, ano - 1),
+    canceladasA: resumoCanceladas(linhasA),
+    canceladasB: resumoCanceladas(linhasB),
+    // mês a mês: os baldes partem os dois períodos sem sobras, por isso as linhas somam os totais
+    meses: p.baldes.map((b): MesComparado => ({
+      ...b,
+      A: metricas(noPeriodo(todas, b.atual.de, b.atual.ate)),
+      B: metricas(noPeriodo(todas, b.anterior.de, b.anterior.ate)),
+    })),
     produtosA: porProduto(linhasA).filter((x) => x.total > 0),
     produtosB: porProduto(linhasB),
     clientesA: porCliente(linhasA).filter((x) => x.total > 0),
-    acumulado: mrrAcumulado(comissoes, ano, p.mesFim),
-    // mês em curso do ano anterior, só até ao mesmo dia (para a linha ser comparável e a coluna somar o total)
-    parcialAnt: p.emCurso ? metricas(noPeriodo(comissoes, `${ano - 1}-${String(p.mesFim).padStart(2, '0')}-01`, p.anterior.ate)) : null,
-    diaFim: Number(p.atual.ate.slice(8, 10)),
-    mixAnos: anos.filter((y) => y <= ano).map((y) => {
-      const ls = comissoes.filter((c) => c.data_adjudicacao?.startsWith(String(y)))
+    acumulado: mrrAcumulado(todas, anoFim, mesFim),
+    anoFim,
+    // a comparação começa antes do primeiro registo: os números de lá estão incompletos
+    inicioHistorico,
+    comparacaoIncompleta: !!inicioHistorico && p.anterior.de < inicioHistorico,
+    mixAnos: anos.filter((y) => y <= anoFim).map((y) => {
+      const ls = todas.filter((c) => c.data_adjudicacao?.startsWith(String(y)))
       const primeiroMes = Math.min(...ls.map((c) => Number(c.data_adjudicacao.slice(5, 7))))
       return { ano: y, primeiroMes, ...metricas(ls) }
     }),
   }
+}
+
+/** "Q3 2026 (1 jul - 30 set 2026)", sem repetir quando o nome já são as datas */
+export function nomeComDatas(nome: string, i: { de: string; ate: string }, emCurso = false) {
+  const d = textoDatas(i)
+  return nome === d ? `${d}${emCurso ? ', em curso' : ''}` : `${nome} (${d}${emCurso ? ', em curso' : ''})`
 }
 
 // ---------- peças visuais ----------
@@ -130,79 +140,83 @@ function Detalhe({ titulo, total, subtitulo, itens, campo, estilo }: {
   )
 }
 
-/** valor vendido por mês: ano em análise vs ano anterior (barras emparelhadas, eixo único).
+const multiAno = (meses: MesComparado[]) => new Set(meses.map((m) => m.ano)).size > 1
+/** mês do período de comparação que corresponde a este (só se mostra quando não é o mesmo mês do ano anterior) */
+const mesAnt = (m: MesComparado) => Number(m.anterior.de.slice(5, 7))
+const outroMes = (m: MesComparado) => mesAnt(m) !== m.mes
+
+/** valor vendido por mês: período em análise vs comparação (barras emparelhadas, eixo único).
  *  Com `linhas`, cada barra mostra no mouseover os projetos que fazem esse valor. */
-export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo = false, parcialAnt = null, altura = 'h-44', linhas }: {
-  mesesA: Metricas[]; mesesB: Metricas[]; ano: number; mesFim: number; emCurso: boolean
-  soPeriodo?: boolean; parcialAnt?: Metricas | null // relatório: só o período comparável (igual à tabela)
+export function GraficoMensal({ meses, nomeA, nomeB, altura = 'h-44', linhas }: {
+  meses: MesComparado[]; nomeA: string; nomeB: string
   altura?: string
   linhas?: Comissao[] // todas as linhas: ativa o detalhe por projeto no mouseover
 }) {
-  const [hover, setHover] = useState<{ i: number; y: number } | null>(null)
-  // valor do ano anterior a desenhar em cada mês: no relatório, o mês em curso conta só os mesmos dias
-  // e os meses seguintes não aparecem, para o gráfico bater certo com a tabela e com o total
-  const ant = mesesB.map((b, i) => {
-    if (!soPeriodo || !emCurso) return b.total
-    if (i + 1 > mesFim) return 0
-    return i + 1 === mesFim && parcialAnt ? parcialAnt.total : b.total
-  })
-  const max = Math.max(1, ...mesesA.map((m) => m.total), ...ant)
+  const [hover, setHover] = useState<{ i: number; lado: 'A' | 'B' } | null>(null)
+  const n = Math.max(1, meses.length)
+  const varios = multiAno(meses)
+  const max = Math.max(1, ...meses.map((m) => Math.max(m.A.total, m.B.total)))
+  const col = 100 / n
 
-  // composição do mês/ano em foco (só se calcula ao passar o rato)
+  // composição do mês em foco (só se calcula ao passar o rato)
   let detalhe: React.ReactNode = null
-  if (hover && linhas) {
-    const pref = `${hover.y}-${String(hover.i + 1).padStart(2, '0')}`
-    const itens = composicao(linhas.filter((c) => c.data_adjudicacao?.startsWith(pref)))
+  if (hover && linhas && meses[hover.i]) {
+    const iv = hover.lado === 'A' ? meses[hover.i].atual : meses[hover.i].anterior
+    const itens = composicao(noPeriodo(linhas, iv.de, iv.ate))
     const tot = itens.reduce((s, x) => s + x.total, 0)
     const pon = itens.reduce((s, x) => s + x.pontual, 0)
-    const direita = hover.i < 6 // meses da 1.ª metade: cartão à direita da coluna; os outros à esquerda
-    const col = 100 / 12
+    const centro = (hover.i + 0.5) * col
+    // 1.ª metade: cartão à direita das barras do mês; 2.ª metade: à esquerda
     detalhe = (
-      <Detalhe titulo={`${MESES[hover.i]} ${hover.y}`} total={tot} itens={itens} campo="total"
+      <Detalhe titulo={nomeIntervalo(iv)} total={tot} itens={itens} campo="total"
         subtitulo={`${itens.length} projeto(s) · pontual ${eur(pon)} · SaaS anual. ${eur(tot - pon)}`}
-        estilo={direita ? { top: 0, left: `calc(${(hover.i + 1) * col}% + 6px)` } : { top: 0, right: `calc(${(12 - hover.i) * col}% + 6px)` }} />
+        estilo={hover.i < n / 2 ? { top: 0, left: `calc(${centro}% + 62px)` } : { top: 0, right: `calc(${100 - centro}% + 62px)` }} />
     )
   }
 
-  const barra = (i: number, y: number, valor: number, cor: string, lado: 'esq' | 'dir') => {
-    const ativo = hover && hover.i === i && hover.y === y
+  const barra = (i: number, lado: 'A' | 'B', valor: number) => {
+    const ativo = hover && hover.i === i && hover.lado === lado
     return (
-      <div className={`w-1/2 h-full flex items-end ${lado === 'esq' ? 'justify-end pr-px' : 'justify-start pl-px'}`}
-        onMouseEnter={linhas ? () => setHover({ i, y }) : undefined}>
-        <div className="w-[84%] rounded-t-[4px] transition-opacity"
-          style={{ height: `${(valor / max) * 100}%`, background: cor, opacity: hover && !ativo ? 0.35 : 1 }} />
+      <div className={`w-1/2 h-full flex items-end ${lado === 'B' ? 'justify-end pr-px' : 'justify-start pl-px'}`}
+        onMouseEnter={linhas ? () => setHover({ i, lado }) : undefined}>
+        <div className="w-[84%] max-w-[56px] rounded-t-[4px] transition-opacity"
+          style={{ height: `${(valor / max) * 100}%`, background: lado === 'A' ? COR_SAAS : COR_ANTERIOR, opacity: hover && !ativo ? 0.35 : 1 }} />
       </div>
     )
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h3 className="font-semibold text-host-navy">Valor vendido por mês</h3>
-        <Legenda itens={[{ cor: COR_ANTERIOR, texto: String(ano - 1) }, { cor: COR_SAAS, texto: String(ano) }]} />
+        <Legenda itens={[{ cor: COR_ANTERIOR, texto: nomeB }, { cor: COR_SAAS, texto: nomeA }]} />
       </div>
       <div className={`relative ${altura}`} onMouseLeave={() => setHover(null)}>
         {/* grelha recessiva: 50% e 100% do máximo */}
         {[0.5, 1].map((f) => (
           <div key={f} className="absolute left-0 right-0 border-t border-dashed border-gray-200" style={{ bottom: `${f * 100}%` }}>
-            <span className="absolute -top-2 right-0 bg-white pl-1 text-[9px] text-gray-400 tabular-nums">{eur(max * f).replace(/,\d\d/, '')}</span>
+            <span className="absolute -top-2 right-0 bg-white pl-1 text-[9px] text-gray-400 tabular-nums">{eur(max * f)}</span>
           </div>
         ))}
         <div className="relative flex items-end gap-1.5 h-full border-b border-gray-300">
-          {mesesA.map((m, i) => {
-            const futuro = emCurso && i + 1 > mesFim
-            return (
-              <div key={i} className="flex-1 flex items-end h-full"
-                title={linhas ? undefined : `${MESES[i]} ${ano}: ${futuro ? '-' : eur(m.total)}\n${MESES[i]} ${ano - 1}: ${eur(ant[i])}`}>
-                {barra(i, ano - 1, ant[i], COR_ANTERIOR, 'esq')}
-                {barra(i, ano, futuro ? 0 : m.total, COR_SAAS, 'dir')}
-              </div>
-            )
-          })}
+          {meses.map((m, i) => (
+            <div key={i} className="flex-1 flex items-end justify-center h-full"
+              title={linhas ? undefined : `${nomeIntervalo(m.atual)}: ${eur(m.A.total)}\n${nomeIntervalo(m.anterior)}: ${eur(m.B.total)}`}>
+              {barra(i, 'B', m.B.total)}
+              {barra(i, 'A', m.A.total)}
+            </div>
+          ))}
         </div>
         {detalhe}
       </div>
-      <div className="flex gap-1.5 mt-1">{MESES.map((_, i) => <div key={i} className="flex-1 text-center text-[10px] text-gray-500">{abrev(i)}</div>)}</div>
+      <div className="flex gap-1.5 mt-1">
+        {meses.map((m, i) => (
+          <div key={i} className="flex-1 text-center text-[10px] text-gray-500 leading-tight">
+            {abrev(m.mes - 1)}{varios && ` ${String(m.ano).slice(2)}`}
+            {outroMes(m) && <span className="block text-[9px] text-gray-400">vs {abrev(mesAnt(m) - 1).toLowerCase()}</span>}
+          </div>
+        ))}
+      </div>
       <p className="text-[11px] text-gray-500 mt-2">
         Valor vendido = vendas pontuais + SaaS anualizado (mensalidade × 12).{linhas && <span className="no-print"> Passa o rato sobre uma barra para ver os projetos.</span>}
       </p>
@@ -211,12 +225,15 @@ export function GraficoMensal({ mesesA, mesesB, ano, mesFim, emCurso, soPeriodo 
 }
 
 /** a tabela é a vista acessível do gráfico mensal: todos os números, sem depender da cor */
-export function TabelaMensal({ mesesA, mesesB, ano, mesFim, emCurso, A, B, periodo, parcialAnt, diaFim, compacta = false }: {
-  mesesA: Metricas[]; mesesB: Metricas[]; ano: number; mesFim: number; emCurso: boolean; A: Metricas; B: Metricas; periodo: string
-  parcialAnt?: Metricas | null; diaFim?: number; compacta?: boolean // relatório A4: linhas mais baixas
+export function TabelaMensal({ meses, A, B, nomeA, nomeB, compacta = false }: {
+  meses: MesComparado[]; A: Metricas; B: Metricas; nomeA: string; nomeB: string
+  compacta?: boolean // relatório A4: linhas mais baixas
 }) {
   const py = compacta ? 'py-1' : 'py-1.5'
   const td = `px-2 ${py} text-right tabular-nums`
+  const varios = multiAno(meses)
+  // nomes compridos (datas soltas) não cabem no cabeçalho: aí diz-se só "período"/"comparação"
+  const cab = (nome: string, alt: string) => (nome.length <= 12 ? nome : alt)
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[12px]">
@@ -226,33 +243,37 @@ export function TabelaMensal({ mesesA, mesesB, ano, mesFim, emCurso, A, B, perio
             <th className={`${td} font-medium`}>Pontual</th>
             <th className={`${td} font-medium`}>Receita mensal</th>
             <th className={`${td} font-medium`}>SaaS anual.</th>
-            <th className={`${td} font-medium`}>Total {ano}</th>
-            <th className={`${td} font-medium`}>Total {ano - 1}</th>
+            <th className={`${td} font-medium`}>Total {cab(nomeA, 'período')}</th>
+            <th className={`${td} font-medium`}>Total {cab(nomeB, 'comparação')}</th>
             <th className={`${td} font-medium`}>Δ</th>
           </tr>
         </thead>
         <tbody>
-          {mesesA.map((m, i) => {
-            const futuro = emCurso && i + 1 > mesFim
-            const corrente = emCurso && i + 1 === mesFim
-            const b = mesesB[i]
+          {meses.map((m, i) => {
+            const dias = diasParciais(m.atual)
             return (
-              <tr key={i} className={`border-b border-gray-100 ${futuro ? 'text-gray-300' : ''}`}>
-                <td className={`px-2 ${py}`}>{MESES[i]}{corrente && <span className="ml-1 text-[10px] text-gray-400">(1-{diaFim})</span>}</td>
-                <td className={td}>{futuro ? '-' : eur(m.pontual)}</td>
-                <td className={td}>{futuro ? '-' : `${eur(m.mrr)}`}</td>
-                <td className={td}>{futuro ? '-' : eur(m.anual)}</td>
-                <td className={`${td} font-semibold text-host-navy`}>{futuro ? '-' : eur(m.total)}</td>
-                <td className={`${td} text-gray-500`}>{futuro ? '-' : eur(corrente && parcialAnt ? parcialAnt.total : b.total)}</td>
-                {/* o mês em curso ainda não está completo: comparar seria enganador */}
-                <td className={td}>{futuro || corrente ? '-' : <Var a={m.total} b={b.total} />}</td>
+              <tr key={i} className="border-b border-gray-100">
+                <td className={`px-2 ${py}`}>
+                  {MESES[m.mes - 1]}{varios && ` ${m.ano}`}
+                  {dias && <span className="ml-1 text-[10px] text-gray-400">({dias})</span>}
+                  {outroMes(m) && <span className="ml-1 text-[10px] text-gray-400">vs {abrev(mesAnt(m) - 1).toLowerCase()}</span>}
+                </td>
+                <td className={td}>{eur(m.A.pontual)}</td>
+                <td className={td}>{eur(m.A.mrr)}</td>
+                <td className={td}>{eur(m.A.anual)}</td>
+                <td className={`${td} font-semibold text-host-navy`}>{eur(m.A.total)}</td>
+                <td className={`${td} text-gray-500`}>{eur(m.B.total)}</td>
+                {/* mês a decorrer: compara os mesmos dias, mas ainda pode haver vendas por carregar */}
+                <td className={td} title={m.aDecorrer ? 'Mês a decorrer: ainda pode haver vendas por carregar.' : undefined}>
+                  {m.aDecorrer ? '-' : <Var a={m.A.total} b={m.B.total} />}
+                </td>
               </tr>
             )
           })}
         </tbody>
         <tfoot>
           <tr className="border-t-2 border-gray-300 font-semibold text-host-navy">
-            <td className={`px-2 ${compacta ? 'py-1.5' : 'py-2'}`}>{emCurso ? `Período (${periodo})` : 'Total do ano'}</td>
+            <td className={`px-2 ${compacta ? 'py-1.5' : 'py-2'}`}>Total{nomeA.length <= 12 ? ` ${nomeA}` : ' do período'}</td>
             <td className={td}>{eur(A.pontual)}</td>
             <td className={td}>{eur(A.mrr)}</td>
             <td className={td}>{eur(A.anual)}</td>
@@ -267,7 +288,7 @@ export function TabelaMensal({ mesesA, mesesB, ano, mesFim, emCurso, A, B, perio
 }
 
 /** novo MRR acumulado ao longo do tempo (uma série: o título identifica-a, sem caixa de legenda) */
-export function GraficoMrrAcumulado({ dados, altura = 'h-44' }: { dados: { ano: number; mes: number; novo: number; acumulado: number }[]; altura?: string }) {
+export function GraficoMrrAcumulado({ dados, altura = 'h-44', rotuloFim = 'hoje' }: { dados: { ano: number; mes: number; novo: number; acumulado: number }[]; altura?: string; rotuloFim?: string }) {
   if (dados.length < 2) return <p className="text-sm text-gray-400">Sem histórico suficiente.</p>
   const W = 600, H = 170, padT = 12, padB = 4
   const max = Math.max(1, ...dados.map((d) => d.acumulado))
@@ -279,7 +300,7 @@ export function GraficoMrrAcumulado({ dados, altura = 'h-44' }: { dados: { ano: 
     <div>
       <div className="flex items-baseline justify-between mb-1">
         <h3 className="font-semibold text-host-navy">Receita mensal acumulada</h3>
-        <span className="text-sm text-gray-600">hoje: <b className="tabular-nums" style={{ color: COR_SAAS }}>{eur(ult.acumulado)}/mês</b></span>
+        <span className="text-sm text-gray-600">{rotuloFim}: <b className="tabular-nums" style={{ color: COR_SAAS }}>{eur(ult.acumulado)}/mês</b></span>
       </div>
       <p className="text-[11px] text-gray-500 mb-2">Soma da receita recorrente mensal que vendeste desde {MESES[dados[0].mes - 1].toLowerCase()} {dados[0].ano}. Exclui as vendas registadas como canceladas.</p>
       <svg viewBox={`0 0 ${W} ${H}`} className={`w-full ${altura} overflow-visible`} preserveAspectRatio="none">
@@ -394,22 +415,133 @@ export function ListaBarras({ titulo, itens, comparar, compacta = false }: {
 
 // ---------- secção completa no Analytics (só para o gestor) ----------
 
-export default function VendasPainel({ comissoes, ano }: { comissoes: Comissao[]; ano: number }) {
-  const v = calcularVendas(comissoes, ano)
+/** link do relatório PDF com o mesmo período e a mesma comparação do ecrã */
+export function urlRelatorio(sel: SelecaoPeriodo, ano: number) {
+  const q = new URLSearchParams({ ano: String(ano), p: sel.preset, comp: sel.modo })
+  if (sel.preset === 'pers') { q.set('de', sel.de || ''); q.set('ate', sel.ate || '') }
+  return `/relatorio?${q.toString()}`
+}
+
+/** lê do URL do relatório a seleção feita no ecrã (valores desconhecidos -> predefinição) */
+export function selecaoDoUrl(params: URLSearchParams): SelecaoPeriodo {
+  const presets: Preset[] = ['ano', 'q1', 'q2', 'q3', 'q4', 'pers']
+  const p = params.get('p') as Preset
+  return {
+    preset: presets.includes(p) ? p : 'ano',
+    modo: params.get('comp') === 'anterior' ? 'anterior' : 'homologo',
+    de: params.get('de') || undefined,
+    ate: params.get('ate') || undefined,
+  }
+}
+
+/** escolha do período (ano, trimestre ou datas) e da base de comparação */
+function SeletorPeriodo({ sel, setSel, ano, p, erro, inicioHistorico, comparacaoIncompleta }: {
+  sel: SelecaoPeriodo; setSel: (s: SelecaoPeriodo) => void; ano: number
+  p?: Periodo; erro?: string; inicioHistorico: string | null; comparacaoIncompleta: boolean
+}) {
+  const hoje = hojeIso()
+  const anoEmCurso = ano === new Date().getFullYear()
+  const opcoes: { k: Preset; txt: string; futuro?: boolean }[] = [
+    { k: 'ano', txt: anoEmCurso ? `${ano} até hoje` : `Ano ${ano}` },
+    ...[1, 2, 3, 4].map((q) => ({ k: `q${q}` as Preset, txt: `Q${q}`, futuro: `${ano}-${String(3 * q - 2).padStart(2, '0')}-01` > hoje })),
+    { k: 'pers', txt: 'Datas…' },
+  ]
+  const modos: { k: ModoComparacao; txt: string; dica: string }[] = [
+    { k: 'homologo', txt: 'Mesmo período do ano anterior', dica: 'Recomendado: compara com as mesmas datas do ano anterior, sem o efeito da sazonalidade.' },
+    { k: 'anterior', txt: 'Período imediatamente anterior', dica: 'Mostra a tendência recente (ex.: Q3 vs Q2), mas é afetado pela sazonalidade.' },
+  ]
+  const escolher = (k: Preset) => {
+    // ao passar para "Datas…", começa com as datas do período que estava a ver
+    if (k === 'pers') setSel({ ...sel, preset: k, de: sel.de || p?.atual.de, ate: sel.ate || p?.atual.ate })
+    else setSel({ ...sel, preset: k })
+  }
+  const botao = (ativo: boolean) =>
+    `px-3 py-1.5 text-sm font-semibold rounded-md transition-colors disabled:opacity-35 disabled:cursor-not-allowed ${ativo ? 'bg-host-navy text-white' : 'text-host-navy hover:bg-gray-100'}`
+
+  return (
+    <div className="bg-white rounded-xl border p-3 mb-3 no-print">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Período</span>
+          <div className="flex flex-wrap gap-0.5 rounded-lg border p-0.5" role="group" aria-label="Período">
+            {opcoes.map((o) => (
+              <button key={o.k} type="button" aria-pressed={sel.preset === o.k} disabled={o.futuro}
+                title={o.futuro ? 'Este trimestre ainda não começou' : undefined}
+                onClick={() => escolher(o.k)} className={botao(sel.preset === o.k)}>{o.txt}</button>
+            ))}
+          </div>
+        </div>
+        {sel.preset === 'pers' && (
+          <div className="flex items-center gap-1.5 text-sm">
+            <input type="date" value={sel.de || ''} max={hoje} min={inicioHistorico || undefined}
+              onChange={(e) => setSel({ ...sel, de: e.target.value })} className="border rounded-md px-2 py-1 text-sm" aria-label="Data inicial" />
+            <span className="text-gray-500">até</span>
+            <input type="date" value={sel.ate || ''} min={sel.de || undefined}
+              onChange={(e) => setSel({ ...sel, ate: e.target.value })} className="border rounded-md px-2 py-1 text-sm" aria-label="Data final" />
+          </div>
+        )}
+        <div className="flex items-center gap-2 lg:ml-auto">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-gray-500">Comparar com</span>
+          <div className="flex flex-wrap gap-0.5 rounded-lg border p-0.5" role="group" aria-label="Comparar com">
+            {modos.map((m) => (
+              <button key={m.k} type="button" aria-pressed={sel.modo === m.k} title={m.dica}
+                onClick={() => setSel({ ...sel, modo: m.k })} className={botao(sel.modo === m.k)}>{m.txt}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {erro ? <p className="mt-2 text-sm text-red-600">{erro}</p> : p && (
+        <div className="mt-2.5 pt-2.5 border-t border-gray-100 text-sm text-gray-700 space-y-1">
+          <div>
+            <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1.5 align-middle" style={{ background: COR_SAAS }} />
+            <b className="text-host-navy">{nomeComDatas(p.nome, p.atual, p.emCurso)}</b>
+            <span className="mx-2 text-gray-400">vs</span>
+            <span className="inline-block w-2.5 h-2.5 rounded-sm mr-1.5 align-middle" style={{ background: COR_ANTERIOR }} />
+            <b className="text-host-navy">{nomeComDatas(p.nomeAnt, p.anterior)}</b>
+          </div>
+          {p.emCurso && <p className="text-xs text-gray-500">O período ainda está a decorrer: compara-se só até hoje, com o mesmo número de dias do período de comparação.</p>}
+          {p.modo === 'anterior' && <p className="text-xs text-amber-700">Atenção à sazonalidade: períodos seguidos têm épocas diferentes. Para avaliar crescimento, usa o mesmo período do ano anterior.</p>}
+          {comparacaoIncompleta && inicioHistorico && <p className="text-xs text-amber-700">O registo de vendas começa em {MESES[Number(inicioHistorico.slice(5, 7)) - 1].toLowerCase()} {inicioHistorico.slice(0, 4)}: o período de comparação está incompleto.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function VendasPainel({ comissoes, ano, sel, setSel }: {
+  comissoes: Comissao[]; ano: number; sel: SelecaoPeriodo; setSel: (s: SelecaoPeriodo) => void
+}) {
+  // mudar o ano no topo da página volta ao ano inteiro se estavam escolhidas datas soltas
+  const anoAnt = useRef(ano)
+  useEffect(() => {
+    if (anoAnt.current !== ano && sel.preset === 'pers') setSel({ ...sel, preset: 'ano' })
+    anoAnt.current = ano
+  }, [ano]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const r = calcularPeriodo(sel, ano)
+  const datas = comissoes.map((c) => c.data_adjudicacao).filter(Boolean).sort()
+  const inicio = datas.length ? `${datas[0].slice(0, 7)}-01` : null
+  if (!r.p) {
+    return <SeletorPeriodo sel={sel} setSel={setSel} ano={ano} erro={r.erro} inicioHistorico={inicio} comparacaoIncompleta={false} />
+  }
+  const v = calcularVendas(comissoes, r.p)
   const { p, A, B } = v
-  const periodo = textoPeriodo(ano)
   const ticketA = A.n ? A.total / A.n : 0
   const ticketB = B.n ? B.total / B.n : 0
-  const ref = p.emCurso ? `mesmo período de ${ano - 1}` : String(ano - 1)
+  const ref = p.nomeAnt
+  const fimTxt = p.atual.ate === hojeIso() ? 'hoje' : `em ${fmtDia(p.atual.ate)} ${p.atual.ate.slice(0, 4)}`
 
   return (
     <div>
+      <SeletorPeriodo sel={sel} setSel={setSel} ano={ano} p={p} inicioHistorico={v.inicioHistorico} comparacaoIncompleta={v.comparacaoIncompleta} />
+
       <div className="flex flex-wrap items-end justify-between gap-2 mb-3">
         <p className="text-sm text-gray-600">
-          Vendas pela <b>data da venda</b> · {periodo} {ano}, comparado com o {ref}.
-          {v.canceladasA.n > 0 && <span className="ml-2 text-gray-500">· ⊘ {v.canceladasA.negocios} negócio(s) cancelado(s) neste período{v.canceladasA.n > v.canceladasA.negocios ? ` (${v.canceladasA.n} linhas)` : ''}: excluídos {eur(v.canceladasA.excluido)}{v.canceladasA.realizado > 0 ? ` (conta só o que o cliente pagou: ${eur(v.canceladasA.realizado)})` : ''}.</span>}
+          Vendas pela <b>data da venda</b>.
+          {v.canceladasA.n > 0 && <span className="ml-2 text-gray-500">⊘ {v.canceladasA.negocios} negócio(s) cancelado(s) neste período{v.canceladasA.n > v.canceladasA.negocios ? ` (${v.canceladasA.n} linhas)` : ''}: excluídos {eur(v.canceladasA.excluido)}{v.canceladasA.realizado > 0 ? ` (conta só o que o cliente pagou: ${eur(v.canceladasA.realizado)})` : ''}.</span>}
         </p>
-        <button onClick={() => window.open(`/relatorio?ano=${ano}`, '_blank')}
+        <button onClick={() => window.open(urlRelatorio(sel, ano), '_blank')}
           className="no-print px-4 py-2 rounded-lg bg-host-blue text-white text-sm font-semibold shadow-glow hover:bg-host-bluedark">
           📄 Relatório de desempenho (PDF)
         </button>
@@ -424,34 +556,34 @@ export default function VendasPainel({ comissoes, ano }: { comissoes: Comissao[]
       </div>
 
       <div className="bg-white rounded-xl border p-4 mb-3">
-        <GraficoMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} linhas={v.todas} />
+        <GraficoMensal meses={v.meses} nomeA={p.nome} nomeB={p.nomeAnt} linhas={v.todas} />
       </div>
 
       <div className="bg-white rounded-xl border p-4 mb-3">
         <h3 className="font-semibold text-host-navy mb-2">Mês a mês</h3>
-        <TabelaMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} A={A} B={B} periodo={periodo} parcialAnt={v.parcialAnt} diaFim={v.diaFim} />
+        <TabelaMensal meses={v.meses} A={A} B={B} nomeA={p.nome} nomeB={p.nomeAnt} />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-3 mb-3">
-        <div className="bg-white rounded-xl border p-4"><GraficoMrrAcumulado dados={v.acumulado} /></div>
-        <div className="bg-white rounded-xl border p-4"><MixPorAno dados={v.mixAnos} anoAtual={ano} linhas={v.todas} /></div>
+        <div className="bg-white rounded-xl border p-4"><GraficoMrrAcumulado dados={v.acumulado} rotuloFim={fimTxt} /></div>
+        <div className="bg-white rounded-xl border p-4"><MixPorAno dados={v.mixAnos} anoAtual={v.anoFim} linhas={v.todas} /></div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-3 mb-3">
         <div className="bg-white rounded-xl border p-4">
-          <ListaBarras titulo={`Por produto (${periodo})`}
+          <ListaBarras titulo={`Por produto (${p.nome})`}
             itens={v.produtosA.map((x) => ({ nome: x.tipo, total: x.total, cor: x.saas ? COR_SAAS : COR_PONTUAL, detalhe: `${x.n} venda(s)` }))}
           />
           <p className="text-[11px] text-gray-500 mt-3">{"Desde dez/2025, Setup Fee e SaaS > 24 passaram a ser registados à parte (antes contavam como Serviços e SaaS < 24). Por isso não se compara produto a produto com anos anteriores; a comparação válida é pontual vs recorrente."}</p>
         </div>
         <div className="bg-white rounded-xl border p-4">
-          <ListaBarras titulo={`Top clientes (${periodo})`}
+          <ListaBarras titulo={`Top clientes (${p.nome})`}
             itens={v.clientesA.slice(0, 8).map((x) => ({ nome: x.nome, total: x.total, cor: x.mrr > 0 ? COR_SAAS : COR_PONTUAL, detalhe: `${x.n} linha(s)` }))} />
         </div>
       </div>
 
       <p className="text-[11px] text-gray-500">
-        Fonte: vendas com comissão registada nesta aplicação (não substitui a contabilidade). Ticket médio no {ref}: {eur(ticketB)}.
+        Fonte: vendas com comissão registada nesta aplicação (não substitui a contabilidade). Ticket médio em {ref}: {eur(ticketB)}.
       </p>
     </div>
   )

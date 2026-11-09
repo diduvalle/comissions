@@ -5,15 +5,17 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import type { Comissao } from '../types'
-import { COR_SAAS, COR_PONTUAL, variacao, fmtVar, eur0 as eur } from '../vendas'
+import { COR_SAAS, COR_PONTUAL, variacao, fmtVar, eur0 as eur, calcularPeriodo, textoDatas } from '../vendas'
 import {
-  calcularVendas, textoPeriodo, Kpi, Var, GraficoMensal, TabelaMensal,
+  calcularVendas, selecaoDoUrl, nomeComDatas, Kpi, Var, GraficoMensal, TabelaMensal,
   GraficoMrrAcumulado, MixPorAno, ListaBarras,
 } from './Vendas'
 
 export default function Relatorio() {
   const [params] = useSearchParams()
   const ano = Number(params.get('ano')) || new Date().getFullYear()
+  const sel = selecaoDoUrl(params)
+  const r = calcularPeriodo(sel, ano)
   const [comissoes, setComissoes] = useState<Comissao[]>([])
   const [def, setDef] = useState<{ gestor_nome?: string; gestor_cargo?: string } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -30,17 +32,21 @@ export default function Relatorio() {
     })()
   }, [])
 
+  const nomePeriodo = r.p?.nome || String(ano)
   useEffect(() => {
-    document.title = `Relatório de desempenho ${ano} - ${def?.gestor_nome || ''}`.trim()
-  }, [ano, def])
+    document.title = `Relatório de desempenho ${nomePeriodo} - ${def?.gestor_nome || ''}`.trim()
+  }, [nomePeriodo, def])
 
   if (loading) return <div className="p-10 text-gray-500">A preparar o relatório…</div>
+  if (!r.p) return <div className="p-10 text-gray-600">Período inválido: {r.erro} Volta ao Analytics e escolhe outro período.</div>
 
-  const v = calcularVendas(comissoes, ano)
+  const v = calcularVendas(comissoes, r.p)
   const { p, A, B } = v
-  const periodo = textoPeriodo(ano)
-  const anoAnt = ano - 1
-  const ref = p.emCurso ? `no mesmo período de ${anoAnt}` : `em ${anoAnt}`
+  const periodo = p.nome
+  // nos cartões, "Q3 2025: 1 234 €"; se o nome forem datas compridas, diz-se só "comparação"
+  const anoAnt = p.nomeAnt.length <= 12 ? p.nomeAnt : "Comparação"
+  const datasA = textoDatas(p.atual), datasB = textoDatas(p.anterior)
+  const ref = `em ${datasB}`
   const vTotal = variacao(A.total, B.total)
   const vMrr = variacao(A.mrr, B.mrr)
   const ticketA = A.n ? A.total / A.n : 0
@@ -50,8 +56,8 @@ export default function Relatorio() {
   // frase de abertura, escrita a partir dos números (o que a direção lê primeiro)
   const sobeDesce = (x: number | null) => (x == null ? '' : x >= 0 ? `mais ${fmtVar(x).replace('+', '')}` : `menos ${fmtVar(x).replace('-', '')}`)
   const resumo = [
-    `${p.emCurso ? `De ${periodo.replace(' - ', ' a ')} de ${ano}` : `Em ${ano}`}, o valor total vendido foi de ${eur(A.total)}`,
-    vTotal != null ? `, ${sobeDesce(vTotal)} do que ${ref}` : '',
+    `${p.nome === textoDatas(p.previsto) ? `De ${datasA.replace(' - ', ' a ')}` : `No período ${p.nome} (${datasA.replace(' - ', ' a ')}${p.emCurso ? ', em curso' : ''})`}, o valor total vendido foi de ${eur(A.total)}`,
+    vTotal != null ? `, ${sobeDesce(vTotal)} do que ${ref.replace(' - ', ' a ')}` : '',
     '. ',
     `A nova receita mensal de subscrições (MRR) foi de ${eur(A.mrr)}/mês`,
     vMrr != null ? ` (${sobeDesce(vMrr)})` : '',
@@ -70,7 +76,7 @@ export default function Relatorio() {
       {n > 1 && (
         <div className="flex items-center justify-between text-[10px] text-gray-500 pb-2 mb-4 border-b border-gray-200">
           <span><b className="text-host-navy">Relatório de desempenho comercial</b> · {nome}</span>
-          <span>{periodo} {ano}</span>
+          <span>{nomeComDatas(periodo, p.atual)}</span>
         </div>
       )}
       <div className="flex-1 min-h-0">{children}</div>
@@ -100,7 +106,7 @@ export default function Relatorio() {
       {/* barra de ações (não sai no PDF) */}
       <div className="no-print sticky top-0 z-10 bg-host-navy text-white mb-6">
         <div className="max-w-[210mm] mx-auto px-4 py-2.5 flex items-center gap-3">
-          <span className="text-sm font-semibold whitespace-nowrap">Relatório de desempenho {ano}</span>
+          <span className="text-sm font-semibold whitespace-nowrap">Relatório de desempenho {periodo}</span>
           <span className="text-xs text-white/60 hidden md:inline truncate">No ecrã de impressão, escolhe <b>"Guardar como PDF"</b> no destino.</span>
           <button onClick={() => window.print()} className="ml-auto shrink-0 whitespace-nowrap bg-white text-host-navy text-sm font-semibold rounded-lg px-4 py-1.5 hover:bg-gray-100">
             Guardar PDF
@@ -121,7 +127,7 @@ export default function Relatorio() {
           <img src="/host-color.png" alt="Host Hotel Systems" className="h-9 mt-1" />
         </div>
         <div className="flex flex-wrap justify-between gap-2 text-xs text-gray-600 mt-3 mb-4">
-          <span>Período: <b className="text-host-navy">{periodo} {ano}</b>{p.emCurso && <> · comparado com o mesmo período de {anoAnt}</>}</span>
+          <span>Período: <b className="text-host-navy">{nomeComDatas(periodo, p.atual, p.emCurso)}</b> · comparado com <b className="text-host-navy">{nomeComDatas(p.nomeAnt, p.anterior)}</b></span>
           <span>Emitido em {hoje}</span>
         </div>
 
@@ -147,9 +153,9 @@ export default function Relatorio() {
         </div>
 
         <div className="mb-5">
-          <GraficoMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} soPeriodo parcialAnt={v.parcialAnt} altura="h-32" />
+          <GraficoMensal meses={v.meses} nomeA={p.nome} nomeB={p.nomeAnt} altura="h-32" />
         </div>
-        <GraficoMrrAcumulado dados={v.acumulado} altura="h-24" />
+        <GraficoMrrAcumulado dados={v.acumulado} altura="h-24" rotuloFim={p.emCurso ? 'hoje' : `em ${textoDatas(p.atual).split(' - ')[1]}`} />
       </Folha>
 
       {/* ===== Página 2: detalhe ===== */}
@@ -157,7 +163,7 @@ export default function Relatorio() {
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-2">Mês a mês</h2>
           <div className="break-inside-avoid mb-6">
-            <TabelaMensal mesesA={v.mesesA} mesesB={v.mesesB} ano={ano} mesFim={p.mesFim} emCurso={p.emCurso} A={A} B={B} periodo={periodo} parcialAnt={v.parcialAnt} diaFim={v.diaFim} compacta />
+            <TabelaMensal meses={v.meses} A={A} B={B} nomeA={p.nome} nomeB={p.nomeAnt} compacta />
           </div>
 
           <div className="grid grid-cols-2 gap-6 mb-6">
@@ -179,7 +185,7 @@ export default function Relatorio() {
       <Folha n={3}>
         <div>
           <h2 className="text-sm font-bold uppercase tracking-wide text-gray-500 mb-3">Tendência e comissões</h2>
-          <div className="mb-6"><MixPorAno dados={v.mixAnos} anoAtual={ano} /></div>
+          <div className="mb-6"><MixPorAno dados={v.mixAnos} anoAtual={v.anoFim} /></div>
 
           <div className="break-inside-avoid mb-6 rounded-xl border p-4">
             <h3 className="font-semibold mb-2">Comissões geradas no período</h3>
@@ -196,7 +202,12 @@ export default function Relatorio() {
             <ul className="list-disc ml-4 space-y-0.5">
               <li><b>Fonte:</b> vendas com comissão registada na aplicação de gestão de comissões. Não substitui os registos contabilísticos da empresa.</li>
               <li><b>Data:</b> cada venda conta no mês da sua data de adjudicação.</li>
-              {p.emCurso && <li><b>Comparação justa:</b> o ano em curso ({periodo} {ano}) é comparado com o mesmo intervalo de dias de {anoAnt}, nunca com o ano completo. O mês em curso não é comparado, por estar incompleto.</li>}
+              <li><b>Comparação:</b> {p.modo === 'homologo'
+                ? <>com o mesmo período do ano anterior ({datasB}), o que neutraliza a sazonalidade.</>
+                : <>com o período imediatamente anterior, com a mesma duração ({datasB}). Períodos seguidos têm épocas diferentes, por isso a sazonalidade pode influenciar a variação.</>}
+                {p.emCurso && <> O período ainda está a decorrer: compara-se só até {textoDatas(p.atual).split(' - ')[1]}, com o mesmo número de dias, e o mês em curso não tem variação, por estar incompleto.</>}
+                {v.comparacaoIncompleta && v.inicioHistorico && <> O registo de vendas começa em {v.inicioHistorico.slice(5, 7)}/{v.inicioHistorico.slice(0, 4)}: o período de comparação está incompleto.</>}
+              </li>
               <li><b>SaaS:</b> a "nova receita mensal" (em inglês MRR, <i>Monthly Recurring Revenue</i>) é a soma das mensalidades das novas subscrições vendidas; "anualizado" = mensalidade × 12. <b>Valor total vendido</b> = vendas pontuais + SaaS anualizado (valor do primeiro ano).</li>
               <li><b>Vendas canceladas:</b> contam apenas o valor que o cliente chegou a pagar; o resto do contrato é excluído, e a receita mensal é excluída por inteiro.{v.canceladasA.n > 0 ? ` No período: ${v.canceladasA.negocios} negócio(s) cancelado(s), ${eur(v.canceladasA.excluido)} excluídos${v.canceladasA.realizado > 0 ? ` (${eur(v.canceladasA.realizado)} pagos pelo cliente mantêm-se)` : ''}.` : ' Não há vendas canceladas registadas no período.'}</li>
               <li><b>Receita mensal acumulada</b> soma as mensalidades vendidas desde o início do registo; só desconta os cancelamentos registados na aplicação.</li>
