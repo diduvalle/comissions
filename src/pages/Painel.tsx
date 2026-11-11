@@ -94,17 +94,22 @@ export default function Painel() {
   // "aberta" = por pagar E não finalizada (finalizada = fechada manualmente, não transita)
   // cancelada também não transita: a comissão ainda por pagar deixa de ser devida
   const emAberto = (c: Comissao) => c.estado !== 'paga' && !c.finalizada && !c.cancelada
+  // pago neste ciclo e ainda não "arrumado" pelo Fechar mês. Uma linha de um mês anterior que fica
+  // paga agora tem de continuar no mapa até ao fecho: senão o pagamento dela não entra no "Pago",
+  // no "A PAGAR" do fecho, nem é registado como pago (e reaparecia no mês seguinte).
+  const pagoNoCiclo = (c: Comissao) => Number(c.valor_pago || 0) > Number((c as any).pago_anterior || 0) + 0.005
   const proprias = comissoes.filter((c) => c.mes_referencia === sel)
-  const transitadas = comissoes.filter((c) => emAberto(c) && parseMref(c.mes_referencia).order < selOrder)
+  const transitadas = comissoes.filter((c) => (emAberto(c) || pagoNoCiclo(c)) && parseMref(c.mes_referencia).order < selOrder)
   const visiveis = aberto
-    ? comissoes.filter((c) => emAberto(c))
+    ? comissoes.filter((c) => emAberto(c) || pagoNoCiclo(c))
     : [...transitadas, ...proprias]
 
   const comEfetiva = (c: Comissao) => (c.cancelada ? Number(c.valor_pago || 0) : Number(c.comissao_calculada || 0))
   const totComissao = visiveis.reduce((s, c) => s + comEfetiva(c), 0)
   // "Pago" = só o que é pago neste ciclo (exclui parciais já pagas em meses anteriores)
   const totPago = visiveis.reduce((s, c) => s + Math.max(0, Number(c.valor_pago || 0) - Number((c as any).pago_anterior || 0)), 0)
-  const porPagar = visiveis.filter((c) => emAberto(c)).reduce((s, c) => s + Number(c.comissao_calculada || 0), 0)
+  // "Por pagar" = o que ainda falta pagar (numa parcial, desconta o que já foi pago)
+  const porPagar = visiveis.filter((c) => emAberto(c)).reduce((s, c) => s + Math.max(0, Number(c.comissao_calculada || 0) - Number(c.valor_pago || 0)), 0)
 
   // pesquisa + filtro (só afeta as linhas mostradas; totais e envio usam o mês completo)
   const termo = q.trim().toLowerCase()
@@ -176,7 +181,7 @@ export default function Painel() {
       const naoReconhecidas: any[] = []
       // totais para validar de uma só olhada
       let somaLida = 0      // soma da coluna "Comissão Paga" que a app conseguiu ler
-      let jaPagoAntes = 0   // parte dessas linhas que já tinha sido paga em meses anteriores
+      const jaPagoAntes = 0 // o Excel traz só o pago deste mês: nada a descontar
       let nPagas = 0, nParciais = 0
 
       for (const l of lidas) {
@@ -193,11 +198,15 @@ export default function Painel() {
         }
         const devido = c.partilhada ? Math.round(comissao * 50) / 100 : comissao
 
-        // "Comissão Paga": número = valor pago; PAGO (-1) = paga por inteiro; vazio = sem alteração
+        // "Comissão Paga" = o que o diretor paga ESTE MÊS (é isso que o Excel soma no "A PAGAR").
+        // O que já tinha sido pago em meses anteriores (pago_anterior) mantém-se e soma-se:
+        // um 0 quer dizer "nada este mês", nunca "apagar pagamentos antigos".
+        // PAGO (-1) = paga por inteiro (este mês paga o que faltava); vazio = sem alteração.
         if (l.pago != null) {
-          const novoPago = l.pago === -1 ? devido : l.pago
-          somaLida += novoPago
-          jaPagoAntes += Math.min(novoPago, Number((c as any).pago_anterior || 0))
+          const antes = Number((c as any).pago_anterior || 0)
+          const desteMes = l.pago === -1 ? Math.max(0, Math.round((devido - antes) * 100) / 100) : l.pago
+          const novoPago = Math.round((antes + desteMes) * 100) / 100
+          somaLida += desteMes
           if (estadoPara(devido, novoPago) === 'paga') nPagas++
           else if (novoPago > 0) nParciais++
           if (Math.abs(novoPago - Number(c.valor_pago || 0)) > 0.005) patch.valor_pago = novoPago
@@ -224,7 +233,7 @@ export default function Painel() {
       } else {
         setExcelMsg('')
         const bonusFinal = bonus != null ? bonus : Number((env as any)?.bonus || 0)
-        const aPagarMes = Math.round((somaLida - jaPagoAntes) * 100) / 100
+        const aPagarMes = Math.round((somaLida - jaPagoAntes) * 100) / 100 // jaPagoAntes fica 0: o Excel já é só deste mês
         setPreview({
           mudancas, naoReconhecidas, mudancaBonus,
           totais: {
