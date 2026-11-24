@@ -3,6 +3,7 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
-    { "path": "/api/backup", "schedule": "0 9 1 * *" }
+    { "path": "/api/backup", "schedule": "0 9 1 * *" },
+    { "path": "/api/keepalive", "schedule": "40 11 * * *" }
   ]
 }
